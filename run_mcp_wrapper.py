@@ -6,8 +6,8 @@ import os
 import sys
 from pathlib import Path
 
-# Load environment from the main project
-env_file = Path("/Users/jk/Library/CloudStorage/OneDrive-Personal/Dokumente/Github/FoM2526/.env")
+# Load environment from the FoM project (adjusted for local workspace)
+env_file = Path("/Users/dekay/Dokumente/projects/programmieren/FoM/test.env")
 if env_file.exists():
     try:
         from dotenv import load_dotenv
@@ -22,9 +22,19 @@ if env_file.exists():
                     key, value = line.split('=', 1)
                     os.environ[key.strip()] = value.strip().strip('"').strip("'")
 
-# Set MCP-specific environment variables
-os.environ['QDRANT_LOCAL_PATH'] = str(Path(__file__).parent / "../FoM2526/Folien+Lit/qdrant_db")
-os.environ['COLLECTION_NAME'] = 'forschungsmethoden_literatur'
+# Ensure local package source is importable (src layout)
+repo_root = Path(__file__).parent
+src_dir = repo_root / "src"
+if src_dir.exists():
+    sys.path.insert(0, str(src_dir))
+
+# Set MCP-specific environment variables (local Qdrant + OpenAI embeddings)
+os.environ['QDRANT_LOCAL_PATH'] = "/Users/dekay/Dokumente/projects/programmieren/FoM/db/qdrant_db"
+
+# Allow override via MCP_COLLECTION_NAME or existing COLLECTION_NAME
+default_collection = 'forschungsmethoden_literatur'
+override_collection = os.environ.get('MCP_COLLECTION_NAME') or os.environ.get('COLLECTION_NAME')
+os.environ['COLLECTION_NAME'] = override_collection or default_collection
 os.environ['EMBEDDING_PROVIDER'] = 'openai'
 os.environ['EMBEDDING_MODEL'] = 'text-embedding-3-small'
 os.environ['TOOL_FIND_DESCRIPTION'] = 'Suche nach relevanten Forschungsmethoden-Inhalten mit natürlicher Sprache. Verwende deutsche Begriffe für beste Ergebnisse.'
@@ -38,12 +48,16 @@ if not os.environ.get('OPENAI_API_KEY'):
 print(f"✅ OpenAI API key loaded: {os.environ.get('OPENAI_API_KEY', '')[:8]}...", file=sys.stderr)
 print(f"✅ Qdrant path: {os.environ.get('QDRANT_LOCAL_PATH')}", file=sys.stderr)
 
-# Import and run the main server
+# Try to import the packaged entrypoint; if that fails, run the server module via runpy
 try:
-    from mcp_server_qdrant.main import main
-    main()
-except Exception as e:
-    print(f"❌ Error starting MCP server: {e}", file=sys.stderr)
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+    from mcp_server_qdrant.main import main as server_main
+    server_main()
+except Exception:
+    try:
+        import runpy
+        runpy.run_path(str(src_dir / "mcp_server_qdrant/server.py"), run_name="__main__")
+    except Exception as e:
+        print(f"❌ Error starting MCP server: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
