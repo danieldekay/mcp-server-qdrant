@@ -1,4 +1,4 @@
-# mcp-server-qdrant: A Qdrant MCP server
+# mcp-server-qdrant: A Qdrant MCP server with RAG
 
 [![smithery badge](https://smithery.ai/badge/mcp-server-qdrant)](https://smithery.ai/protocol/mcp-server-qdrant)
 
@@ -12,7 +12,13 @@ This repository is an example of how to create a MCP server for [Qdrant](https:/
 ## Overview
 
 An official Model Context Protocol server for keeping and retrieving memories in the Qdrant vector search engine.
-It acts as a semantic memory layer on top of the Qdrant database.
+It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Generation) capabilities including:
+
+- **Intelligent Document Chunking** - Automatically split large documents using semantic, sentence, or fixed strategies
+- **Bulk Document Ingestion** - CLI tool for ingesting entire directories of documents
+- **Set-Based Organization** - Organize documents into knowledge bases with semantic filtering
+- **Multiple Embedding Providers** - Support for FastEmbed, Model2Vec, OpenAI-compatible, and Gemini
+- **Hybrid Search** - Combine dense and sparse vectors for improved retrieval accuracy
 
 ## Components
 
@@ -38,16 +44,31 @@ It acts as a semantic memory layer on top of the Qdrant database.
 
 The configuration of the server is done using environment variables:
 
-| Name                     | Description                                                         | Default Value                                                     |
-|--------------------------|---------------------------------------------------------------------|-------------------------------------------------------------------|
-| `QDRANT_URL`             | URL of the Qdrant server                                            | None                                                              |
-| `QDRANT_API_KEY`         | API key for the Qdrant server                                       | None                                                              |
-| `COLLECTION_NAME`        | Name of the default collection to use.                              | None                                                              |
-| `QDRANT_LOCAL_PATH`      | Path to the local Qdrant database (alternative to `QDRANT_URL`)     | None                                                              |
-| `EMBEDDING_PROVIDER`     | Embedding provider to use (currently only "fastembed" is supported) | `fastembed`                                                       |
-| `EMBEDDING_MODEL`        | Name of the embedding model to use                                  | `sentence-transformers/all-MiniLM-L6-v2`                          |
-| `TOOL_STORE_DESCRIPTION` | Custom description for the store tool                               | See default in [`settings.py`](src/mcp_server_qdrant/settings.py) |
-| `TOOL_FIND_DESCRIPTION`  | Custom description for the find tool                                | See default in [`settings.py`](src/mcp_server_qdrant/settings.py) |
+| Name                            | Description                                                         | Default Value                                                     |
+|---------------------------------|---------------------------------------------------------------------|-------------------------------------------------------------------|
+| `QDRANT_URL`                    | URL of the Qdrant server                                            | None                                                              |
+| `QDRANT_API_KEY`                | API key for the Qdrant server                                       | None                                                              |
+| `COLLECTION_NAME`               | Name of the default collection to use                               | None                                                              |
+| `COLLECTION_NAMES`              | List of collection names for multiple collections support           | None                                                              |
+| `QDRANT_LOCAL_PATH`             | Path to the local Qdrant database (alternative to `QDRANT_URL`)     | None                                                              |
+| `QDRANT_READ_ONLY`              | Enable read-only mode (disables write operations)                   | `false`                                                           |
+| `EMBEDDING_PROVIDER`            | Embedding provider: "fastembed", "model2vec", "oai_compat", "openai", or "gemini" | `fastembed`                                                       |
+| `EMBEDDING_MODEL`               | Name of the embedding model to use                                  | `sentence-transformers/all-MiniLM-L6-v2`                          |
+| `USE_UNNAMED_VECTORS`           | Use Qdrant's unnamed vector field instead of named vectors          | `false`                                                           |
+| `SPARSE_EMBEDDING_MODEL`        | Sparse embedding model for hybrid search                            | None                                                              |
+| `OAI_COMPAT_ENDPOINT`           | OpenAI-compatible API endpoint URL                                  | `https://api.openai.com/v1`                                       |
+| `OAI_COMPAT_API_KEY`            | API key for OpenAI-compatible endpoint                              | None                                                              |
+| `OAI_COMPAT_VEC_SIZE`           | Vector size override for OpenAI-compatible embeddings               | None (auto-detected)                                              |
+| `GEMINI_API_KEY`                | API key for Google Gemini embeddings                                | None                                                              |
+| `ENABLE_CHUNKING`               | Enable automatic document chunking for RAG                          | `false`                                                           |
+| `MAX_CHUNK_SIZE`                | Maximum chunk size in tokens/characters                             | `512`                                                             |
+| `CHUNK_OVERLAP`                 | Overlap between consecutive chunks                                  | `50`                                                              |
+| `CHUNK_STRATEGY`                | Chunking strategy: "semantic", "sentence", or "fixed"               | `semantic`                                                        |
+| `QDRANT_ENABLE_SEMANTIC_SET_MATCHING` | Enable set-based document filtering                         | `false`                                                           |
+| `QDRANT_SETS_CONFIG`            | Path to document sets configuration file                            | `.qdrant_sets.json`                                               |
+| `TOOL_STORE_DESCRIPTION`        | Custom description for the store tool                               | See default in [`settings.py`](src/mcp_server_qdrant/settings.py) |
+| `TOOL_FIND_DESCRIPTION`         | Custom description for the find tool                                | See default in [`settings.py`](src/mcp_server_qdrant/settings.py) |
+| `TOOL_HYBRID_FIND_DESCRIPTION`  | Custom description for the hybrid find tool                         | See default in [`settings.py`](src/mcp_server_qdrant/settings.py) |
 
 Note: You cannot provide both `QDRANT_URL` and `QDRANT_LOCAL_PATH` at the same time.
 
@@ -180,6 +201,140 @@ This MCP server will automatically create a collection with the specified name i
 
 By default, the server will use the `sentence-transformers/all-MiniLM-L6-v2` embedding model to encode memories.
 For the time being, only [FastEmbed](https://qdrant.github.io/fastembed/) models are supported.
+
+## RAG Features
+
+### Document Chunking
+
+Automatically split large documents into optimal chunks for better retrieval performance.
+
+#### Configuration
+
+```shell
+QDRANT_URL="http://localhost:6333" \
+COLLECTION_NAME="large-docs" \
+ENABLE_CHUNKING=true \
+MAX_CHUNK_SIZE=512 \
+CHUNK_OVERLAP=50 \
+CHUNK_STRATEGY=semantic \
+uvx mcp-server-qdrant
+```
+
+#### Chunking Strategies
+
+1. **Semantic Chunking** (Recommended)
+   - Splits at natural boundaries (paragraphs, sentences)
+   - Preserves context and meaning
+   - Best for general documents
+
+2. **Sentence Chunking**
+   - Splits only at sentence boundaries
+   - Good for preserving structural integrity
+   - Ideal for code and technical documents
+
+3. **Fixed Chunking**
+   - Splits at fixed token/character boundaries
+   - Predictable chunk sizes
+   - Useful for consistent processing
+
+#### Recommended Settings
+
+| Use Case | Size | Overlap | Strategy |
+|----------|------|---------|----------|
+| General documents | 512 | 50 | semantic |
+| Code snippets | 300 | 30 | sentence |
+| Long articles | 1024 | 100 | semantic |
+
+### Document Ingest CLI
+
+Bulk ingest documents from directories with the `qdrant-ingest` command.
+
+#### Basic Usage
+
+```shell
+# Ingest all documents from a directory
+qdrant-ingest ingest /path/to/docs \
+  --collection my-knowledge-base \
+  --knowledge-base "Company Docs" \
+  --enable-chunking
+
+# Ingest with filtering
+qdrant-ingest ingest /path/to/code \
+  --collection codebase \
+  --include "\.py$" \
+  --exclude "test_.*" \
+  --enable-chunking \
+  --chunk-strategy sentence
+```
+
+#### Supported File Types
+
+The CLI automatically processes 25+ file types:
+- **Documents**: .txt, .md, .markdown
+- **Code**: .py, .js, .ts, .java, .go, .rs, .c, .cpp, .rb, .php
+- **Config**: .json, .yaml, .yml, .toml, .xml, .ini
+- **Web**: .html, .css, .scss
+- **Data**: .csv, .sql
+
+#### Commands
+
+```shell
+# Ingest documents
+qdrant-ingest ingest <path> [options]
+
+# List all collections
+qdrant-ingest list
+```
+
+#### CLI Options
+
+- `--url` - Qdrant server URL
+- `--api-key` - Qdrant API key
+- `--collection` - Collection name
+- `--embedding-model` - Embedding model to use
+- `--knowledge-base` - Knowledge base name (added to metadata)
+- `--doc-type` - Document type (added to metadata)
+- `--include` - Regex pattern for files to include
+- `--exclude` - Regex pattern for files to exclude
+- `--enable-chunking` - Enable document chunking
+- `--chunk-strategy` - Chunking strategy (semantic/sentence/fixed)
+- `--max-chunk-size` - Maximum chunk size
+- `--chunk-overlap` - Chunk overlap
+
+### Set-Based Filtering
+
+Organize documents into logical groups with semantic matching.
+
+#### Configuration File
+
+Create a `.qdrant_sets.json` file:
+
+```json
+{
+  "sets": [
+    {
+      "slug": "backend_services",
+      "description": "Backend microservices and API documentation",
+      "aliases": ["backend", "api", "services"]
+    },
+    {
+      "slug": "frontend_code",
+      "description": "Frontend React components and UI code",
+      "aliases": ["frontend", "ui", "react"]
+    }
+  ]
+}
+```
+
+#### Enable Set-Based Filtering
+
+```shell
+QDRANT_ENABLE_SEMANTIC_SET_MATCHING=true \
+QDRANT_SETS_CONFIG=.qdrant_sets.json \
+uvx mcp-server-qdrant
+```
+
+The system will automatically match natural language queries to the appropriate document sets based on semantic similarity.
 
 ## Support for other tools
 

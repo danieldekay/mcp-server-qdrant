@@ -10,6 +10,15 @@ from mcp_server_qdrant.settings import METADATA_PATH
 
 logger = logging.getLogger(__name__)
 
+# Import chunking only if enabled
+try:
+    from mcp_server_qdrant.chunking import ChunkStrategy, DocumentChunker
+
+    CHUNKING_AVAILABLE = True
+except ImportError:
+    CHUNKING_AVAILABLE = False
+    logger.warning("Chunking not available. Install nltk and tiktoken for RAG features.")
+
 Metadata = dict[str, Any]
 ArbitraryFilter = dict[str, Any]
 
@@ -42,6 +51,10 @@ class QdrantConnector:
         embedding_provider: EmbeddingProvider,
         qdrant_local_path: str | None = None,
         field_indexes: dict[str, models.PayloadSchemaType] | None = None,
+        enable_chunking: bool = False,
+        chunk_strategy: str = "semantic",
+        max_chunk_size: int = 512,
+        chunk_overlap: int = 50,
     ):
         self._qdrant_url = qdrant_url.rstrip("/") if qdrant_url else None
         self._qdrant_api_key = qdrant_api_key
@@ -51,6 +64,24 @@ class QdrantConnector:
             location=qdrant_url, api_key=qdrant_api_key, path=qdrant_local_path
         )
         self._field_indexes = field_indexes
+
+        # Initialize chunker if enabled
+        self._enable_chunking = enable_chunking and CHUNKING_AVAILABLE
+        self._chunker = None
+        if self._enable_chunking:
+            try:
+                strategy = ChunkStrategy(chunk_strategy)
+                self._chunker = DocumentChunker(
+                    strategy=strategy,
+                    max_chunk_size=max_chunk_size,
+                    chunk_overlap=chunk_overlap,
+                )
+                logger.info(
+                    f"Document chunking enabled: {chunk_strategy}, max_size={max_chunk_size}, overlap={chunk_overlap}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to initialize chunker: {e}")
+                self._enable_chunking = False
 
     async def get_collection_names(self) -> list[str]:
         """
@@ -63,6 +94,7 @@ class QdrantConnector:
     async def store(self, entry: Entry, *, collection_name: str | None = None):
         """
         Store some information in the Qdrant collection, along with the specified metadata.
+        If chunking is enabled, the document will be split and each chunk stored separately.
         :param entry: The entry to store in the Qdrant collection.
         :param collection_name: The name of the collection to store the information in, optional. If not provided,
                                 the default collection is used.
@@ -71,6 +103,30 @@ class QdrantConnector:
         assert collection_name is not None
         await self._ensure_collection_exists(collection_name)
 
+        # Handle chunking if enabled
+        if self._enable_chunking and self._chunker:
+            chunks = self._chunker.chunk_text(entry.content)
+            if len(chunks) > 1:
+                logger.info(f"Document split into {len(chunks)} chunks")
+                # Store each chunk separately
+                for i, chunk in enumerate(chunks):
+                    chunk_metadata = entry.metadata.copy() if entry.metadata else {}
+                    chunk_metadata["chunk_index"] = i
+                    chunk_metadata["total_chunks"] = len(chunks)
+                    chunk_metadata["is_chunk"] = True
+                    chunk_entry = Entry(content=chunk, metadata=chunk_metadata)
+                    await self._store_single(chunk_entry, collection_name=collection_name)
+                return
+
+        # Store as single entry (no chunking or only one chunk)
+        await self._store_single(entry, collection_name=collection_name)
+
+    async def _store_single(self, entry: Entry, *, collection_name: str):
+        """
+        Store a single entry in the Qdrant collection.
+        :param entry: The entry to store.
+        :param collection_name: The name of the collection.
+        """
         # Embed the document
         # ToDo: instead of embedding text explicitly, use `models.Document`,
         # it should unlock usage of server-side inference.

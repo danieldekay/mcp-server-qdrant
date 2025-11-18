@@ -13,6 +13,7 @@ from mcp_server_qdrant.embeddings.base import EmbeddingProvider
 from mcp_server_qdrant.embeddings.factory import create_embedding_provider
 from mcp_server_qdrant.qdrant import ArbitraryFilter, Entry, Metadata, QdrantConnector
 from mcp_server_qdrant.settings import (
+    ChunkingSettings,
     EmbeddingProviderSettings,
     QdrantSettings,
     ToolSettings,
@@ -34,12 +35,14 @@ class QdrantMCPServer(FastMCP):
         qdrant_settings: QdrantSettings,
         embedding_provider_settings: Optional[EmbeddingProviderSettings] = None,
         embedding_provider: Optional[EmbeddingProvider] = None,
+        chunking_settings: Optional[ChunkingSettings] = None,
         name: str = "mcp-server-qdrant",
         instructions: str | None = None,
         **settings: Any,
     ):
         self.tool_settings = tool_settings
         self.qdrant_settings = qdrant_settings
+        self.chunking_settings = chunking_settings or ChunkingSettings()
 
         if embedding_provider_settings and embedding_provider:
             raise ValueError(
@@ -72,6 +75,10 @@ class QdrantMCPServer(FastMCP):
             self.embedding_provider,
             qdrant_settings.local_path,
             make_indexes(qdrant_settings.filterable_fields_dict()),
+            enable_chunking=self.chunking_settings.enable_chunking,
+            chunk_strategy=self.chunking_settings.chunk_strategy,
+            max_chunk_size=self.chunking_settings.max_chunk_size,
+            chunk_overlap=self.chunking_settings.chunk_overlap,
         )
 
         super().__init__(name=name, instructions=instructions, **settings)

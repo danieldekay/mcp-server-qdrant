@@ -48,6 +48,29 @@ class EmbeddingProviderSettings(BaseSettings):
     )
 
 
+class ChunkingSettings(BaseSettings):
+    """
+    Configuration for document chunking.
+    """
+
+    enable_chunking: bool = Field(
+        default=False,
+        validation_alias="ENABLE_CHUNKING",
+    )
+    max_chunk_size: int = Field(
+        default=512,
+        validation_alias="MAX_CHUNK_SIZE",
+    )
+    chunk_overlap: int = Field(
+        default=50,
+        validation_alias="CHUNK_OVERLAP",
+    )
+    chunk_strategy: Literal["semantic", "sentence", "fixed"] = Field(
+        default="semantic",
+        validation_alias="CHUNK_STRATEGY",
+    )
+
+
 class FilterableField(BaseModel):
     name: str = Field(description="The name of the field payload field to filter on")
     description: str = Field(
@@ -89,6 +112,14 @@ class QdrantSettings(BaseSettings):
 
     allow_arbitrary_filter: bool = Field(
         default=False, validation_alias="QDRANT_ALLOW_ARBITRARY_FILTER"
+    )
+
+    # Set-based filtering
+    enable_semantic_set_matching: bool = Field(
+        default=False, validation_alias="QDRANT_ENABLE_SEMANTIC_SET_MATCHING"
+    )
+    sets_config_path: str | None = Field(
+        default=None, validation_alias="QDRANT_SETS_CONFIG"
     )
 
     def filterable_fields_dict(self) -> dict[str, FilterableField]:
