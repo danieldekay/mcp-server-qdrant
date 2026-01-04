@@ -136,14 +136,31 @@ class QdrantConnector:
         # Search in Qdrant
         # Handle both named vectors and single vector collections
         if vector_name:
-            # Named vector collection
-            search_results = await self._client.query_points(
-                collection_name=collection_name,
-                query=query_vector,
-                using=vector_name,
-                limit=limit,
-                query_filter=query_filter,
-            )
+            # Try named vector first; if not present, gracefully fall back to single-vector query
+            try:
+                search_results = await self._client.query_points(
+                    collection_name=collection_name,
+                    query=query_vector,
+                    using=vector_name,
+                    limit=limit,
+                    query_filter=query_filter,
+                )
+            except ValueError as e:
+                msg = str(e)
+                if "not found in the collection" in msg or "is not found in the collection" in msg:
+                    logger.warning(
+                        "Vector name '%s' not found in collection '%s'; falling back to single-vector query",
+                        vector_name,
+                        collection_name,
+                    )
+                    search_results = await self._client.query_points(
+                        collection_name=collection_name,
+                        query=query_vector,
+                        limit=limit,
+                        query_filter=query_filter,
+                    )
+                else:
+                    raise
         else:
             # Single vector collection (legacy compatibility)
             search_results = await self._client.query_points(
