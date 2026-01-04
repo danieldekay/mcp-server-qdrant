@@ -144,6 +144,7 @@ See [docs/OPENAI_IMPLEMENTATION.md](../docs/OPENAI_IMPLEMENTATION.md) for detail
 ### RAG Features Integration
 
 See [docs/RAG_ATTRIBUTION.md](../docs/RAG_ATTRIBUTION.md) for comprehensive documentation on:
+
 - Document chunking strategies (semantic/sentence/fixed)
 - Bulk ingest CLI tool (`qdrant-ingest`)
 - Set-based filtering for knowledge base organization

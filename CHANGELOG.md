@@ -131,6 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Attribution
 
 ### RAG Features
+
 - **Source:** [mahmoudimus/mcp-server-qdrant](https://github.com/mahmoudimus/mcp-server-qdrant)
 - **Commit:** [5af3f72](https://github.com/mahmoudimus/mcp-server-qdrant/commit/5af3f72f1afd1afa8dce39976cd29191ddb69887)
 - **Author:** Mahmoud Rusty Abdelkader ([@mahmoudimus](https://github.com/mahmoudimus))
@@ -138,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **License:** Apache-2.0
 
 ### Co-authors
+
 - Claude (Anthropic) - Co-author of RAG features
 - Original inspiration from avidspartan1/mcp-server-qdrant-rag fork
 
@@ -148,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The RAG features are **fully backward compatible** and disabled by default. To enable:
 
 1. **Install optional dependencies** (if using chunking):
+
    ```bash
    uv sync
    # Optional: For enhanced chunking
@@ -155,6 +158,7 @@ The RAG features are **fully backward compatible** and disabled by default. To e
    ```
 
 2. **Enable chunking** (optional):
+
    ```bash
    export ENABLE_CHUNKING=true
    export CHUNK_STRATEGY=semantic  # or "sentence" or "fixed"
@@ -163,6 +167,7 @@ The RAG features are **fully backward compatible** and disabled by default. To e
    ```
 
 3. **Use bulk ingest** (optional):
+
    ```bash
    qdrant-ingest ingest /path/to/documents \
      --collection my-collection \
@@ -175,6 +180,7 @@ The RAG features are **fully backward compatible** and disabled by default. To e
 To use OpenAI embeddings with existing databases:
 
 1. **Set environment variables**:
+
    ```bash
    export EMBEDDING_PROVIDER=openai
    export EMBEDDING_MODEL=text-embedding-3-small
@@ -190,6 +196,7 @@ None. All new features are opt-in via environment variables.
 ---
 
 For detailed information, see:
+
 - [docs/RAG_ATTRIBUTION.md](docs/RAG_ATTRIBUTION.md) - RAG features documentation
 - [docs/OPENAI_IMPLEMENTATION.md](docs/OPENAI_IMPLEMENTATION.md) - OpenAI provider documentation
 - [docs/development/INTEGRATION_SUMMARY.md](docs/development/INTEGRATION_SUMMARY.md) - Integration process documentation

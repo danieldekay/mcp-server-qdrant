@@ -270,6 +270,7 @@ qdrant-ingest ingest /path/to/code \
 #### Supported File Types
 
 The CLI automatically processes 25+ file types:
+
 - **Documents**: .txt, .md, .markdown
 - **Code**: .py, .js, .ts, .java, .go, .rs, .c, .cpp, .rb, .php
 - **Config**: .json, .yaml, .yml, .toml, .xml, .ini
@@ -631,7 +632,7 @@ QDRANT_URL=":memory:" COLLECTION_NAME="test" \
 fastmcp dev src/mcp_server_qdrant/server.py
 ```
 
-Once started, open your browser to http://localhost:5173 to access the inspector interface.
+Once started, open your browser to <http://localhost:5173> to access the inspector interface.
 
 ## Documentation
 
@@ -644,6 +645,7 @@ For detailed documentation, see the [docs/](docs/) directory:
 ### Examples and Utilities
 
 The [examples/](examples/) directory contains utility scripts:
+
 - Database inspection tools
 - Citation extractors
 - MCP wrapper scripts

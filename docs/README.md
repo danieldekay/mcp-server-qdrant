@@ -29,6 +29,7 @@ The [development/](development/) directory contains:
 ## Additional Resources
 
 For more information, see:
+
 - [../README.md](../README.md) - Main project README
 - [../CHANGELOG.md](../CHANGELOG.md) - Project changelog
 - [../.github/copilot-instructions.md](../.github/copilot-instructions.md) - Developer guide and architecture overview

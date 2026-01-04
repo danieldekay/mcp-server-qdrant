@@ -20,7 +20,11 @@ from typing import List
 
 from mcp_server_qdrant.embeddings.factory import create_embedding_provider
 from mcp_server_qdrant.qdrant import Entry, QdrantConnector
-from mcp_server_qdrant.settings import ChunkingSettings, EmbeddingProviderSettings, QdrantSettings
+from mcp_server_qdrant.settings import (
+    ChunkingSettings,
+    EmbeddingProviderSettings,
+    QdrantSettings,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -164,11 +168,13 @@ async def ingest_command(args):
     )
 
     embedding_settings = EmbeddingProviderSettings(
-        model_name=args.embedding_model or os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
+        model_name=args.embedding_model
+        or os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
     )
 
     chunking_settings = ChunkingSettings(
-        enable_chunking=args.enable_chunking or os.getenv("ENABLE_CHUNKING", "false").lower() == "true",
+        enable_chunking=args.enable_chunking
+        or os.getenv("ENABLE_CHUNKING", "false").lower() == "true",
         max_chunk_size=int(args.max_chunk_size or os.getenv("MAX_CHUNK_SIZE", "512")),
         chunk_overlap=int(args.chunk_overlap or os.getenv("CHUNK_OVERLAP", "50")),
         chunk_strategy=args.chunk_strategy or os.getenv("CHUNK_STRATEGY", "semantic"),
@@ -210,7 +216,9 @@ async def ingest_command(args):
     failed = 0
 
     for file_path in files:
-        if await ingest_file(file_path, connector, qdrant_settings.collection_name, metadata):
+        if await ingest_file(
+            file_path, connector, qdrant_settings.collection_name, metadata
+        ):
             successful += 1
         else:
             failed += 1
@@ -267,12 +275,20 @@ def main():
     ingest_parser.add_argument("--api-key", help="Qdrant API key")
     ingest_parser.add_argument("--collection", help="Collection name")
     ingest_parser.add_argument("--embedding-model", help="Embedding model name")
-    ingest_parser.add_argument("--knowledge-base", help="Knowledge base name for metadata")
+    ingest_parser.add_argument(
+        "--knowledge-base", help="Knowledge base name for metadata"
+    )
     ingest_parser.add_argument("--doc-type", help="Document type for metadata")
     ingest_parser.add_argument("--include", help="Regex pattern for files to include")
     ingest_parser.add_argument("--exclude", help="Regex pattern for files to exclude")
-    ingest_parser.add_argument("--enable-chunking", action="store_true", help="Enable document chunking")
-    ingest_parser.add_argument("--chunk-strategy", choices=["semantic", "sentence", "fixed"], help="Chunking strategy")
+    ingest_parser.add_argument(
+        "--enable-chunking", action="store_true", help="Enable document chunking"
+    )
+    ingest_parser.add_argument(
+        "--chunk-strategy",
+        choices=["semantic", "sentence", "fixed"],
+        help="Chunking strategy",
+    )
     ingest_parser.add_argument("--max-chunk-size", type=int, help="Maximum chunk size")
     ingest_parser.add_argument("--chunk-overlap", type=int, help="Chunk overlap")
 

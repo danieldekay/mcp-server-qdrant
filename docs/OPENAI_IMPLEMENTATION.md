@@ -88,9 +88,10 @@ Update `.vscode/mcp.json`:
 ✅ **OpenAI Provider Creation**: Successfully created provider with `text-embedding-3-small`
 ✅ **Database Connection**: Connected to existing literature database with 5,943 academic segments
 ✅ **Search Functionality**: Successfully searched for German academic content:
+
 - "quantitative Forschungsmethoden"
 - "Validität und Reliabilität"
-- "Stichprobenziehung"  
+- "Stichprobenziehung"
 - "statistische Tests"
 
 ✅ **Storage Functionality**: Successfully stored and retrieved new content
@@ -110,6 +111,7 @@ Update `.vscode/mcp.json`:
 ## Installation and Usage
 
 1. **Clone and Setup**
+
    ```bash
    git clone https://github.com/qdrant/mcp-server-qdrant.git
    cd mcp-server-qdrant
@@ -118,6 +120,7 @@ Update `.vscode/mcp.json`:
    ```
 
 2. **Set Environment Variables**
+
    ```bash
    export OPENAI_API_KEY="your-key-here"
    export EMBEDDING_PROVIDER="openai"
@@ -125,6 +128,7 @@ Update `.vscode/mcp.json`:
    ```
 
 3. **Test the Implementation**
+
    ```bash
    uv run python test_openai_provider.py
    uv run python test_mcp_integration.py

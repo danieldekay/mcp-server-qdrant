@@ -123,7 +123,7 @@ class DocumentChunker:
         chunks = []
 
         # First split by paragraphs
-        paragraphs = re.split(r'\n\s*\n', text)
+        paragraphs = re.split(r"\n\s*\n", text)
 
         current_chunk = ""
         current_size = 0
@@ -144,7 +144,9 @@ class DocumentChunker:
                     chunks.append(current_chunk.strip())
                     # Start new chunk with overlap from end of previous chunk
                     overlap_text = self._get_overlap_text(current_chunk)
-                    current_chunk = overlap_text + " " + sentence if overlap_text else sentence
+                    current_chunk = (
+                        overlap_text + " " + sentence if overlap_text else sentence
+                    )
                     current_size = self._count_tokens(current_chunk)
                 else:
                     current_chunk += (" " if current_chunk else "") + sentence
@@ -173,7 +175,9 @@ class DocumentChunker:
             if current_size + sentence_size > self.max_chunk_size and current_chunk:
                 chunks.append(current_chunk.strip())
                 overlap_text = self._get_overlap_text(current_chunk)
-                current_chunk = overlap_text + " " + sentence if overlap_text else sentence
+                current_chunk = (
+                    overlap_text + " " + sentence if overlap_text else sentence
+                )
                 current_size = self._count_tokens(current_chunk)
             else:
                 current_chunk += (" " if current_chunk else "") + sentence
@@ -231,7 +235,7 @@ class DocumentChunker:
                 logger.warning(f"NLTK sentence tokenization failed: {e}")
 
         # Fallback to regex-based sentence splitting
-        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = re.split(r"(?<=[.!?])\s+", text)
         return [s.strip() for s in sentences if s.strip()]
 
     def _get_overlap_text(self, text: str) -> str:

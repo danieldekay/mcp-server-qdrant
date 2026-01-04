@@ -53,7 +53,9 @@ class SetMatcher:
             # Look for default .qdrant_sets.json
             path = Path(".qdrant_sets.json")
             if not path.exists():
-                logger.info("No sets configuration found. Set-based filtering disabled.")
+                logger.info(
+                    "No sets configuration found. Set-based filtering disabled."
+                )
                 return
 
         if not path.exists():
@@ -119,7 +121,9 @@ class SetMatcher:
 
         # Return match if score is above threshold
         if best_score > 0.3:  # 30% similarity threshold
-            logger.info(f"Matched query '{query}' to set '{best_match}' (score: {best_score:.2f})")
+            logger.info(
+                f"Matched query '{query}' to set '{best_match}' (score: {best_score:.2f})"
+            )
             return best_match
 
         logger.debug(f"No good match found for query '{query}'")
