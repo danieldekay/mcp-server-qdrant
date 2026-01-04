@@ -3,6 +3,11 @@ Document chunking strategies for RAG.
 
 Provides intelligent text splitting for better retrieval performance
 with large documents.
+
+Source: https://github.com/mahmoudimus/mcp-server-qdrant
+Commit: 5af3f72f1afd1afa8dce39976cd29191ddb69887
+Author: Mahmoud Rusty Abdelkader (@mahmoudimus)
+License: Apache-2.0
 """
 
 import logging

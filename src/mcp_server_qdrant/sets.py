@@ -2,6 +2,11 @@
 Set-based filtering for organizing documents into logical groups.
 
 Provides semantic matching to map queries to document sets.
+
+Source: https://github.com/mahmoudimus/mcp-server-qdrant
+Commit: 5af3f72f1afd1afa8dce39976cd29191ddb69887
+Author: Mahmoud Rusty Abdelkader (@mahmoudimus)
+License: Apache-2.0
 """
 
 import json
