@@ -100,4 +100,4 @@ Special thanks to:
 
 - **Original commit message:** See commit `d5cadba` in this repository
 - **Upstream repository:** <https://github.com/mahmoudimus/mcp-server-qdrant>
-- **Our OpenAI implementation:** See `OPENAI_IMPLEMENTATION.md` for our custom OpenAI provider details
+- **Our OpenAI implementation:** See [OPENAI_IMPLEMENTATION.md](OPENAI_IMPLEMENTATION.md) for our custom OpenAI provider details

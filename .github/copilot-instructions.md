@@ -139,11 +139,11 @@ All metadata stored under `metadata` key (defined in `settings.METADATA_PATH`). 
 
 ### OpenAI Integration
 
-See [OPENAI_IMPLEMENTATION.md](../OPENAI_IMPLEMENTATION.md) for details on OpenAI embedding provider added for backward compatibility with existing databases using `text-embedding-3-small` (1536 dims).
+See [docs/OPENAI_IMPLEMENTATION.md](../docs/OPENAI_IMPLEMENTATION.md) for details on OpenAI embedding provider added for backward compatibility with existing databases using `text-embedding-3-small` (1536 dims).
 
 ### RAG Features Integration
 
-See [RAG_ATTRIBUTION.md](../RAG_ATTRIBUTION.md) for comprehensive documentation on:
+See [docs/RAG_ATTRIBUTION.md](../docs/RAG_ATTRIBUTION.md) for comprehensive documentation on:
 - Document chunking strategies (semantic/sentence/fixed)
 - Bulk ingest CLI tool (`qdrant-ingest`)
 - Set-based filtering for knowledge base organization

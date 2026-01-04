@@ -4,7 +4,7 @@
 
 This document describes the implementation of OpenAI embedding support for the official Qdrant MCP server, enabling compatibility with existing Qdrant databases that use OpenAI embeddings.
 
-**Note:** This implementation has been successfully integrated alongside comprehensive RAG features from the [mahmoudimus/mcp-server-qdrant](https://github.com/mahmoudimus/mcp-server-qdrant) fork. See `RAG_ATTRIBUTION.md` for details on the RAG feature integration.
+**Note:** This implementation has been successfully integrated alongside comprehensive RAG features from the [mahmoudimus/mcp-server-qdrant](https://github.com/mahmoudimus/mcp-server-qdrant) fork. See [RAG_ATTRIBUTION.md](RAG_ATTRIBUTION.md) for details on the RAG feature integration.
 
 ## Background
 

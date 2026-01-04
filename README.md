@@ -633,6 +633,23 @@ fastmcp dev src/mcp_server_qdrant/server.py
 
 Once started, open your browser to http://localhost:5173 to access the inspector interface.
 
+## Documentation
+
+For detailed documentation, see the [docs/](docs/) directory:
+
+- **[docs/OPENAI_IMPLEMENTATION.md](docs/OPENAI_IMPLEMENTATION.md)** - OpenAI embedding provider guide
+- **[docs/RAG_ATTRIBUTION.md](docs/RAG_ATTRIBUTION.md)** - RAG features documentation and attribution
+- **[CHANGELOG.md](CHANGELOG.md)** - Project changelog with all features and changes
+
+### Examples and Utilities
+
+The [examples/](examples/) directory contains utility scripts:
+- Database inspection tools
+- Citation extractors
+- MCP wrapper scripts
+
+See [examples/README.md](examples/README.md) for details.
+
 ## License
 
 This MCP server is licensed under the Apache License 2.0. This means you are free to use, modify, and distribute the

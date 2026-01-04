@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Git Remote Setup and RAG Integration",
+			"type": "shell",
+			"command": "git remote -v && echo '---' && git remote remove origin 2>/dev/null || true && git remote add origin https://github.com/danieldekay/mcp-server-qdrant && git remote add upstream https://github.com/mahmoudimus/mcp-server-qdrant && git fetch upstream && git checkout -b integrate-rag-features && git cherry-pick 5af3f72f1afd1afa8dce39976cd29191ddb69887 && echo '---' && git status"
+		},
+		{
+			"label": "Git Setup and RAG Integration",
+			"type": "shell",
+			"command": "git remote -v; echo '--- Setting up remotes ---'; git remote remove origin 2>/dev/null || true; git remote add origin https://github.com/danieldekay/mcp-server-qdrant; git remote add upstream https://github.com/mahmoudimus/mcp-server-qdrant; echo '--- Fetching upstream ---'; git fetch upstream; echo '--- Creating branch ---'; git checkout -b integrate-rag-features; echo '--- Cherry-picking RAG commit ---'; git cherry-pick 5af3f72f1afd1afa8dce39976cd29191ddb69887; echo '--- Final status ---'; git status"
+		}
+	]
+}
