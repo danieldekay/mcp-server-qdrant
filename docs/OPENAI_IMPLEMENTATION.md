@@ -4,6 +4,8 @@
 
 This document describes the implementation of OpenAI embedding support for the official Qdrant MCP server, enabling compatibility with existing Qdrant databases that use OpenAI embeddings.
 
+**Note:** This implementation has been successfully integrated alongside comprehensive RAG features from the [mahmoudimus/mcp-server-qdrant](https://github.com/mahmoudimus/mcp-server-qdrant) fork. See [RAG_ATTRIBUTION.md](RAG_ATTRIBUTION.md) for details on the RAG feature integration.
+
 ## Background
 
 The official [qdrant/mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant) only supports FastEmbed embeddings. However, our existing literature database was created with OpenAI's `text-embedding-3-small` model (1536 dimensions), making it incompatible with the standard MCP server.
@@ -66,13 +68,11 @@ Update `.vscode/mcp.json`:
       "args": ["run", "python", "-m", "mcp_server_qdrant.main"],
       "cwd": "../mcp-server-qdrant",
       "env": {
-        "QDRANT_LOCAL_PATH": "../FoM2526/Folien+Lit/qdrant_db",
-        "COLLECTION_NAME": "forschungsmethoden_literatur",
+        "QDRANT_LOCAL_PATH": "./path/to/qdrant_db",
+        "COLLECTION_NAME": "my_collection",
         "EMBEDDING_PROVIDER": "openai",
         "EMBEDDING_MODEL": "text-embedding-3-small",
-        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
-        "TOOL_FIND_DESCRIPTION": "Suche nach relevanten Forschungsmethoden-Inhalten mit natürlicher Sprache. Verwende deutsche Begriffe für beste Ergebnisse.",
-        "TOOL_STORE_DESCRIPTION": "Speichere wichtige Forschungsmethoden-Inhalte für spätere Verwendung. Der 'information' Parameter sollte den Hauptinhalt enthalten."
+        "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
       }
     }
   }
@@ -84,30 +84,31 @@ Update `.vscode/mcp.json`:
 ### Successful Integration Tests
 
 ✅ **OpenAI Provider Creation**: Successfully created provider with `text-embedding-3-small`
-✅ **Database Connection**: Connected to existing literature database with 5,943 academic segments
-✅ **Search Functionality**: Successfully searched for German academic content:
-- "quantitative Forschungsmethoden"
-- "Validität und Reliabilität"
-- "Stichprobenziehung"  
-- "statistische Tests"
-
+✅ **Database Connection**: Connected to existing vector database
+✅ **Search Functionality**: Successfully performed semantic search queries
 ✅ **Storage Functionality**: Successfully stored and retrieved new content
-✅ **Metadata Handling**: Correctly processed academic metadata (book, chapter, page references)
+✅ **Metadata Handling**: Correctly processed document metadata
 
 ### Sample Search Results
 
-```
-📝 Searching for: 'quantitative Forschungsmethoden'
-   ✅ Found 3 results
-   1. , es können spontan auftretende neue Fragen spezifischen Datenerhebungsmethoden...
-      📚 book: doering_2023, chapter: 2023_Doering
-   2. 1 27 1.3 Empirische Studien planen und durchführen Quantitativer Forschungsprozess...
-      📚 book: doering_2023, chapter: 2023_Doering
+```python
+# Example: Searching for documents
+results = await connector.search(
+    query="machine learning algorithms",
+    collection_name="my_collection",
+    limit=3
+)
+
+# Results contain relevant documents with metadata
+for entry in results:
+    print(f"Content: {entry.content[:100]}...")
+    print(f"Metadata: {entry.metadata}")
 ```
 
 ## Installation and Usage
 
 1. **Clone and Setup**
+
    ```bash
    git clone https://github.com/qdrant/mcp-server-qdrant.git
    cd mcp-server-qdrant
@@ -116,6 +117,7 @@ Update `.vscode/mcp.json`:
    ```
 
 2. **Set Environment Variables**
+
    ```bash
    export OPENAI_API_KEY="your-key-here"
    export EMBEDDING_PROVIDER="openai"
@@ -123,9 +125,10 @@ Update `.vscode/mcp.json`:
    ```
 
 3. **Test the Implementation**
+
    ```bash
-   uv run python test_openai_provider.py
-   uv run python test_mcp_integration.py
+   uv run pytest tests/test_openai_provider.py
+   uv run pytest tests/test_mcp_integration.py
    ```
 
 ## Compatibility Matrix
@@ -166,17 +169,19 @@ mcp-server-qdrant/
 ├── src/mcp_server_qdrant/
 │   └── qdrant.py             # Enhanced compatibility layer
 ├── pyproject.toml            # Added openai dependency
-├── test_openai_provider.py   # OpenAI provider tests
-├── test_mcp_integration.py   # Integration tests
-└── inspect_database.py       # Database inspection tool
+├── tests/
+│   ├── test_openai_provider.py   # OpenAI provider tests
+│   └── test_mcp_integration.py   # Integration tests
+└── examples/
+    └── inspect_database.py       # Database inspection tool
 ```
 
 ## Success Metrics
 
-- ✅ **5,943 literature segments** accessible via MCP tools
-- ✅ **German academic content** searchable with natural language
-- ✅ **Existing database preservation** - no data migration required
-- ✅ **VS Code integration** working with modified MCP server
+- ✅ **Existing databases** accessible via MCP tools without migration
+- ✅ **Natural language search** working with semantic queries
+- ✅ **Database preservation** - no data migration required
+- ✅ **IDE integration** working seamlessly (VS Code, Cursor, etc.)
 - ✅ **Backward compatibility** maintained for future updates
 
-This implementation successfully bridges the gap between the official Qdrant MCP server and existing OpenAI-based vector databases, enabling seamless semantic search and storage capabilities for academic research content.
+This implementation successfully bridges the gap between the official Qdrant MCP server and existing OpenAI-based vector databases, enabling seamless semantic search and storage capabilities for any content type.

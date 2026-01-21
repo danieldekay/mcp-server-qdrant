@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
 
+from mcp_server_qdrant.constants import PDFMetadataKeys
 from mcp_server_qdrant.embeddings.types import EmbeddingProviderType
 
 DEFAULT_TOOL_STORE_DESCRIPTION = (
@@ -12,7 +13,8 @@ DEFAULT_TOOL_FIND_DESCRIPTION = (
     "Look up memories in Qdrant. Use this tool when you need to: \n"
     " - Find memories by their content \n"
     " - Access memories for further analysis \n"
-    " - Get some personal information about the user"
+    " - Get some personal information about the user \n"
+    " - Search for specific pages in documents using filters like 'document_id', 'physical_page_index', or 'page_label'"
 )
 
 METADATA_PATH = "metadata"
@@ -45,6 +47,40 @@ class EmbeddingProviderSettings(BaseSettings):
     model_name: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
         validation_alias="EMBEDDING_MODEL",
+    )
+
+
+class ChunkingSettings(BaseSettings):
+    """
+    Configuration for document chunking.
+    """
+
+    enable_chunking: bool = Field(
+        default=False,
+        validation_alias="ENABLE_CHUNKING",
+    )
+    max_chunk_size: int = Field(
+        default=512,
+        validation_alias="MAX_CHUNK_SIZE",
+    )
+    chunk_overlap: int = Field(
+        default=50,
+        validation_alias="CHUNK_OVERLAP",
+    )
+    chunk_strategy: Literal["semantic", "sentence", "fixed"] = Field(
+        default="semantic",
+        validation_alias="CHUNK_STRATEGY",
+    )
+
+
+class PdfIngestionSettings(BaseSettings):
+    """
+    Configuration for PDF ingestion.
+    """
+
+    enable_pdf_ingestion: bool = Field(
+        default=True,
+        validation_alias="ENABLE_PDF_INGESTION",
     )
 
 
@@ -85,10 +121,39 @@ class QdrantSettings(BaseSettings):
     search_limit: int = Field(default=10, validation_alias="QDRANT_SEARCH_LIMIT")
     read_only: bool = Field(default=False, validation_alias="QDRANT_READ_ONLY")
 
-    filterable_fields: list[FilterableField] | None = Field(default=None)
+    filterable_fields: list[FilterableField] | None = Field(
+        default=[
+            FilterableField(
+                name=PDFMetadataKeys.DOCUMENT_ID,
+                description="The unique identifier of the document",
+                field_type="keyword",
+                condition="==",
+            ),
+            FilterableField(
+                name=PDFMetadataKeys.PHYSICAL_PAGE_INDEX,
+                description="The 0-based physical index of the page",
+                field_type="integer",
+                condition="==",
+            ),
+            FilterableField(
+                name=PDFMetadataKeys.PAGE_LABEL,
+                description="The original page numbering label (e.g., 'iv', '45')",
+                field_type="keyword",
+                condition="==",
+            ),
+        ]
+    )
 
     allow_arbitrary_filter: bool = Field(
         default=False, validation_alias="QDRANT_ALLOW_ARBITRARY_FILTER"
+    )
+
+    # Set-based filtering
+    enable_semantic_set_matching: bool = Field(
+        default=False, validation_alias="QDRANT_ENABLE_SEMANTIC_SET_MATCHING"
+    )
+    sets_config_path: str | None = Field(
+        default=None, validation_alias="QDRANT_SETS_CONFIG"
     )
 
     def filterable_fields_dict(self) -> dict[str, FilterableField]:

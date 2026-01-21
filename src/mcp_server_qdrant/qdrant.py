@@ -5,10 +5,22 @@ from typing import Any
 from pydantic import BaseModel
 from qdrant_client import AsyncQdrantClient, models
 
+from mcp_server_qdrant.constants import PDFMetadataKeys
 from mcp_server_qdrant.embeddings.base import EmbeddingProvider
 from mcp_server_qdrant.settings import METADATA_PATH
 
 logger = logging.getLogger(__name__)
+
+# Import chunking only if enabled
+try:
+    from mcp_server_qdrant.chunking import ChunkStrategy, DocumentChunker
+
+    CHUNKING_AVAILABLE = True
+except ImportError:
+    CHUNKING_AVAILABLE = False
+    logger.warning(
+        "Chunking not available. Install nltk and tiktoken for RAG features."
+    )
 
 Metadata = dict[str, Any]
 ArbitraryFilter = dict[str, Any]
@@ -21,6 +33,30 @@ class Entry(BaseModel):
 
     content: str
     metadata: Metadata | None = None
+
+
+class PDFPageEntry(Entry):
+    """
+    A specialized entry for PDF pages with explicit page metadata.
+    """
+
+    physical_page_index: int
+    page_label: str
+    document_id: str
+    total_pages: int
+
+    def to_entry(self) -> Entry:
+        """Convert to a standard Entry with metadata mapped correctly."""
+        metadata = self.metadata or {}
+        metadata.update(
+            {
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: self.physical_page_index,
+                PDFMetadataKeys.PAGE_LABEL: self.page_label,
+                PDFMetadataKeys.DOCUMENT_ID: self.document_id,
+                PDFMetadataKeys.TOTAL_PAGES: self.total_pages,
+            }
+        )
+        return Entry(content=self.content, metadata=metadata)
 
 
 class QdrantConnector:
@@ -42,6 +78,10 @@ class QdrantConnector:
         embedding_provider: EmbeddingProvider,
         qdrant_local_path: str | None = None,
         field_indexes: dict[str, models.PayloadSchemaType] | None = None,
+        enable_chunking: bool = False,
+        chunk_strategy: str = "semantic",
+        max_chunk_size: int = 512,
+        chunk_overlap: int = 50,
     ):
         self._qdrant_url = qdrant_url.rstrip("/") if qdrant_url else None
         self._qdrant_api_key = qdrant_api_key
@@ -51,6 +91,24 @@ class QdrantConnector:
             location=qdrant_url, api_key=qdrant_api_key, path=qdrant_local_path
         )
         self._field_indexes = field_indexes
+
+        # Initialize chunker if enabled
+        self._enable_chunking = enable_chunking and CHUNKING_AVAILABLE
+        self._chunker = None
+        if self._enable_chunking:
+            try:
+                strategy = ChunkStrategy(chunk_strategy)
+                self._chunker = DocumentChunker(
+                    strategy=strategy,
+                    max_chunk_size=max_chunk_size,
+                    chunk_overlap=chunk_overlap,
+                )
+                logger.info(
+                    f"Document chunking enabled: {chunk_strategy}, max_size={max_chunk_size}, overlap={chunk_overlap}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to initialize chunker: {e}")
+                self._enable_chunking = False
 
     async def get_collection_names(self) -> list[str]:
         """
@@ -63,6 +121,7 @@ class QdrantConnector:
     async def store(self, entry: Entry, *, collection_name: str | None = None):
         """
         Store some information in the Qdrant collection, along with the specified metadata.
+        If chunking is enabled, the document will be split and each chunk stored separately.
         :param entry: The entry to store in the Qdrant collection.
         :param collection_name: The name of the collection to store the information in, optional. If not provided,
                                 the default collection is used.
@@ -71,6 +130,32 @@ class QdrantConnector:
         assert collection_name is not None
         await self._ensure_collection_exists(collection_name)
 
+        # Handle chunking if enabled
+        if self._enable_chunking and self._chunker:
+            chunks = self._chunker.chunk_text(entry.content)
+            if len(chunks) > 1:
+                logger.info(f"Document split into {len(chunks)} chunks")
+                # Store each chunk separately
+                for i, chunk in enumerate(chunks):
+                    chunk_metadata = entry.metadata.copy() if entry.metadata else {}
+                    chunk_metadata["chunk_index"] = i
+                    chunk_metadata["total_chunks"] = len(chunks)
+                    chunk_metadata["is_chunk"] = True
+                    chunk_entry = Entry(content=chunk, metadata=chunk_metadata)
+                    await self._store_single(
+                        chunk_entry, collection_name=collection_name
+                    )
+                return
+
+        # Store as single entry (no chunking or only one chunk)
+        await self._store_single(entry, collection_name=collection_name)
+
+    async def _store_single(self, entry: Entry, *, collection_name: str):
+        """
+        Store a single entry in the Qdrant collection.
+        :param entry: The entry to store.
+        :param collection_name: The name of the collection.
+        """
         # Embed the document
         # ToDo: instead of embedding text explicitly, use `models.Document`,
         # it should unlock usage of server-side inference.
@@ -78,7 +163,7 @@ class QdrantConnector:
 
         # Add to Qdrant
         vector_name = self._embedding_provider.get_vector_name()
-        
+
         # Handle both named vectors and single vector collections
         if vector_name:
             # Named vector collection (new format)
@@ -91,7 +176,7 @@ class QdrantConnector:
             payload = {"text": entry.content}
             if entry.metadata:
                 payload.update(entry.metadata)
-        
+
         await self._client.upsert(
             collection_name=collection_name,
             points=[
@@ -147,7 +232,10 @@ class QdrantConnector:
                 )
             except ValueError as e:
                 msg = str(e)
-                if "not found in the collection" in msg or "is not found in the collection" in msg:
+                if (
+                    "not found in the collection" in msg
+                    or "is not found in the collection" in msg
+                ):
                     logger.warning(
                         "Vector name '%s' not found in collection '%s'; falling back to single-vector query",
                         vector_name,
@@ -181,17 +269,14 @@ class QdrantConnector:
                 # Legacy format (existing database format)
                 content = result.payload["text"]
                 # Extract metadata from other fields
-                metadata = {
-                    k: v for k, v in result.payload.items() 
-                    if k != "text"
-                }
+                metadata = {k: v for k, v in result.payload.items() if k != "text"}
             else:
                 # Fallback: use entire payload as content
                 content = str(result.payload)
                 metadata = None
-            
+
             entries.append(Entry(content=content, metadata=metadata))
-        
+
         return entries
 
     async def _ensure_collection_exists(self, collection_name: str):
