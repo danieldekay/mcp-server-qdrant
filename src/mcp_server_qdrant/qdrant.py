@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel
 from qdrant_client import AsyncQdrantClient, models
 
+from mcp_server_qdrant.constants import PDFMetadataKeys
 from mcp_server_qdrant.embeddings.base import EmbeddingProvider
 from mcp_server_qdrant.settings import METADATA_PATH
 
@@ -17,7 +18,9 @@ try:
     CHUNKING_AVAILABLE = True
 except ImportError:
     CHUNKING_AVAILABLE = False
-    logger.warning("Chunking not available. Install nltk and tiktoken for RAG features.")
+    logger.warning(
+        "Chunking not available. Install nltk and tiktoken for RAG features."
+    )
 
 Metadata = dict[str, Any]
 ArbitraryFilter = dict[str, Any]
@@ -30,6 +33,30 @@ class Entry(BaseModel):
 
     content: str
     metadata: Metadata | None = None
+
+
+class PDFPageEntry(Entry):
+    """
+    A specialized entry for PDF pages with explicit page metadata.
+    """
+
+    physical_page_index: int
+    page_label: str
+    document_id: str
+    total_pages: int
+
+    def to_entry(self) -> Entry:
+        """Convert to a standard Entry with metadata mapped correctly."""
+        metadata = self.metadata or {}
+        metadata.update(
+            {
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: self.physical_page_index,
+                PDFMetadataKeys.PAGE_LABEL: self.page_label,
+                PDFMetadataKeys.DOCUMENT_ID: self.document_id,
+                PDFMetadataKeys.TOTAL_PAGES: self.total_pages,
+            }
+        )
+        return Entry(content=self.content, metadata=metadata)
 
 
 class QdrantConnector:
@@ -115,7 +142,9 @@ class QdrantConnector:
                     chunk_metadata["total_chunks"] = len(chunks)
                     chunk_metadata["is_chunk"] = True
                     chunk_entry = Entry(content=chunk, metadata=chunk_metadata)
-                    await self._store_single(chunk_entry, collection_name=collection_name)
+                    await self._store_single(
+                        chunk_entry, collection_name=collection_name
+                    )
                 return
 
         # Store as single entry (no chunking or only one chunk)
@@ -134,7 +163,7 @@ class QdrantConnector:
 
         # Add to Qdrant
         vector_name = self._embedding_provider.get_vector_name()
-        
+
         # Handle both named vectors and single vector collections
         if vector_name:
             # Named vector collection (new format)
@@ -147,7 +176,7 @@ class QdrantConnector:
             payload = {"text": entry.content}
             if entry.metadata:
                 payload.update(entry.metadata)
-        
+
         await self._client.upsert(
             collection_name=collection_name,
             points=[
@@ -203,7 +232,10 @@ class QdrantConnector:
                 )
             except ValueError as e:
                 msg = str(e)
-                if "not found in the collection" in msg or "is not found in the collection" in msg:
+                if (
+                    "not found in the collection" in msg
+                    or "is not found in the collection" in msg
+                ):
                     logger.warning(
                         "Vector name '%s' not found in collection '%s'; falling back to single-vector query",
                         vector_name,
@@ -237,17 +269,14 @@ class QdrantConnector:
                 # Legacy format (existing database format)
                 content = result.payload["text"]
                 # Extract metadata from other fields
-                metadata = {
-                    k: v for k, v in result.payload.items() 
-                    if k != "text"
-                }
+                metadata = {k: v for k, v in result.payload.items() if k != "text"}
             else:
                 # Fallback: use entire payload as content
                 content = str(result.payload)
                 metadata = None
-            
+
             entries.append(Entry(content=content, metadata=metadata))
-        
+
         return entries
 
     async def _ensure_collection_exists(self, collection_name: str):

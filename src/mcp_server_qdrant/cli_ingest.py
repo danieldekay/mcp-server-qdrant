@@ -18,8 +18,10 @@ import sys
 from pathlib import Path
 from typing import List
 
+from mcp_server_qdrant.constants import PDFMetadataKeys
 from mcp_server_qdrant.embeddings.factory import create_embedding_provider
-from mcp_server_qdrant.qdrant import Entry, QdrantConnector
+from mcp_server_qdrant.pdf_extractor import PDFPageExtractor
+from mcp_server_qdrant.qdrant import Entry, PDFPageEntry, QdrantConnector
 from mcp_server_qdrant.settings import (
     ChunkingSettings,
     EmbeddingProviderSettings,
@@ -35,6 +37,7 @@ SUPPORTED_EXTENSIONS = {
     ".txt",
     ".md",
     ".markdown",
+    ".pdf",
     # Code files
     ".py",
     ".js",
@@ -133,9 +136,9 @@ async def ingest_file(
 
         # Prepare metadata
         file_metadata = {
-            "filename": file_path.name,
-            "filepath": str(file_path),
-            "extension": file_path.suffix,
+            PDFMetadataKeys.FILENAME: file_path.name,
+            PDFMetadataKeys.FILEPATH: str(file_path),
+            PDFMetadataKeys.EXTENSION: file_path.suffix,
             **metadata,
         }
 
@@ -150,6 +153,67 @@ async def ingest_file(
 
     except Exception as e:
         logger.error(f"Failed to ingest {file_path}: {e}")
+        return False
+
+
+async def ingest_pdf_file(
+    file_path: Path, connector: QdrantConnector, collection_name: str, metadata: dict
+) -> bool:
+    """
+    Ingest a PDF file page-by-page.
+    :param file_path: Path to file
+    :param connector: Qdrant connector
+    :param collection_name: Collection name
+    :param metadata: Additional metadata
+    :return: True if successful
+    """
+    try:
+        extractor = PDFPageExtractor(str(file_path))
+        pages_data = await extractor.extract_all_pages()
+        total_pages = len(pages_data)
+
+        if total_pages == 0:
+            logger.warning(f"Skipping empty PDF: {file_path}")
+            return False
+
+        logger.info(f"Ingesting {total_pages} pages from: {file_path}")
+
+        for content, physical_index, page_label in pages_data:
+            if not content.strip():
+                logger.debug(
+                    f"Skipping empty page {physical_index} (label: {page_label}) in {file_path}"
+                )
+                continue
+
+            # Prepare metadata
+            file_metadata = {
+                PDFMetadataKeys.FILENAME: file_path.name,
+                PDFMetadataKeys.FILEPATH: str(file_path),
+                PDFMetadataKeys.EXTENSION: file_path.suffix,
+                **metadata,
+            }
+
+            # Create PDFPageEntry
+            entry = PDFPageEntry(
+                content=content,
+                metadata=file_metadata,
+                physical_page_index=physical_index,
+                page_label=page_label,
+                document_id=file_path.name,
+                total_pages=total_pages,
+            )
+
+            # Convert to standard Entry with metadata mapped correctly and store
+            await connector.store(entry.to_entry(), collection_name=collection_name)
+
+            if (physical_index + 1) % 10 == 0 or (physical_index + 1) == total_pages:
+                logger.info(
+                    f"Processing {file_path.name}: page {physical_index + 1}/{total_pages} (label: {page_label})"
+                )
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to ingest PDF {file_path}: {e}")
         return False
 
 
@@ -216,9 +280,16 @@ async def ingest_command(args):
     failed = 0
 
     for file_path in files:
-        if await ingest_file(
-            file_path, connector, qdrant_settings.collection_name, metadata
-        ):
+        if file_path.suffix.lower() == ".pdf":
+            success = await ingest_pdf_file(
+                file_path, connector, qdrant_settings.collection_name, metadata
+            )
+        else:
+            success = await ingest_file(
+                file_path, connector, qdrant_settings.collection_name, metadata
+            )
+
+        if success:
             successful += 1
         else:
             failed += 1
