@@ -9,8 +9,10 @@ from qdrant_client import models
 from mcp_server_qdrant.common.filters import make_indexes
 from mcp_server_qdrant.common.func_tools import make_partial_function
 from mcp_server_qdrant.common.wrap_filters import wrap_filters
+from mcp_server_qdrant.constants import PDFMetadataKeys
 from mcp_server_qdrant.embeddings.base import EmbeddingProvider
 from mcp_server_qdrant.embeddings.factory import create_embedding_provider
+from mcp_server_qdrant.formatters import EntryFormatter, XMLEntryFormatter
 from mcp_server_qdrant.qdrant import ArbitraryFilter, Entry, Metadata, QdrantConnector
 from mcp_server_qdrant.settings import (
     ChunkingSettings,
@@ -36,6 +38,7 @@ class QdrantMCPServer(FastMCP):
         embedding_provider_settings: Optional[EmbeddingProviderSettings] = None,
         embedding_provider: Optional[EmbeddingProvider] = None,
         chunking_settings: Optional[ChunkingSettings] = None,
+        entry_formatter: Optional[EntryFormatter] = None,
         name: str = "mcp-server-qdrant",
         instructions: str | None = None,
         **settings: Any,
@@ -43,6 +46,7 @@ class QdrantMCPServer(FastMCP):
         self.tool_settings = tool_settings
         self.qdrant_settings = qdrant_settings
         self.chunking_settings = chunking_settings or ChunkingSettings()
+        self.entry_formatter = entry_formatter or XMLEntryFormatter()
 
         if embedding_provider_settings and embedding_provider:
             raise ValueError(
@@ -87,10 +91,12 @@ class QdrantMCPServer(FastMCP):
 
     def format_entry(self, entry: Entry) -> str:
         """
-        Feel free to override this method in your subclass to customize the format of the entry.
+        Format an entry using the configured formatter.
+        Can be overridden in subclasses or customized via constructor injection.
+        :param entry: Entry to format
+        :return: Formatted string
         """
-        entry_metadata = json.dumps(entry.metadata) if entry.metadata else ""
-        return f"<entry><content>{entry.content}</content><metadata>{entry_metadata}</metadata></entry>"
+        return self.entry_formatter.format(entry)
 
     def setup_tools(self):
         """
