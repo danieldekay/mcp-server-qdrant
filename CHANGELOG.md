@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - PDF Page-by-Page Ingestion (2026-01-21)
+
+- **PDF Page-Level Extraction** (`src/mcp_server_qdrant/pdf_extractor.py`)
+  - Intelligent PDF text extraction using `pypdf` library
+  - Dual page numbering system: preserves both physical position and document labels (Roman numerals, chapters, etc.)
+  - Async-first implementation wrapping synchronous extraction in thread pools
+  - Graceful fallback to sequential numbering when PDF labels are missing
+
+- **Enhanced CLI Ingestion** (`src/mcp_server_qdrant/cli_ingest.py`)
+  - Integrated PDF support into `qdrant-ingest` tool
+  - Automatic page-by-page decomposition during ingestion
+  - Per-page metadata tagging (document_id, physical_index, page_label)
+
+- **PDF metadata filtering**
+  - New filterable fields: `document_id`, `physical_page_index`, `page_label`
+  - Deep-link support for search results referencing specific pages
+
 ### Added - RAG Features Integration (2026-01-04)
 
 **Integrated comprehensive RAG capabilities from [mahmoudimus/mcp-server-qdrant](https://github.com/mahmoudimus/mcp-server-qdrant)**

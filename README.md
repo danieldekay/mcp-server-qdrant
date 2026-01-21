@@ -14,6 +14,7 @@ This repository is an example of how to create a MCP server for [Qdrant](https:/
 An official Model Context Protocol server for keeping and retrieving memories in the Qdrant vector search engine.
 It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Generation) capabilities including:
 
+- **PDF Page-by-Page Ingestion** - Store PDF pages as separate entries with precise page label metadata
 - **Intelligent Document Chunking** - Automatically split large documents using semantic, sentence, or fixed strategies
 - **Bulk Document Ingestion** - CLI tool for ingesting entire directories of documents
 - **Set-Based Organization** - Organize documents into knowledge bases with semantic filtering

@@ -13,7 +13,7 @@ This is a **Model Context Protocol (MCP) server** that bridges LLM applications 
 - **[common/filters.py](../src/mcp_server_qdrant/common/filters.py)**: Dynamic filterable field system using Qdrant conditions
 - **[chunking.py](../src/mcp_server_qdrant/chunking.py)**: RAG document chunking (semantic/sentence/fixed strategies) - from mahmoudimus fork
 - **[cli_ingest.py](../src/mcp_server_qdrant/cli_ingest.py)**: Bulk document ingestion CLI tool - from mahmoudimus fork
-- **[sets.py](../src/mcp_server_qdrant/sets.py)**: Set-based filtering for organizing documents - from mahmoudimus fork
+- **[sets.py](../src/mcp_server_qdrant/sets.py)**: Set-based filtering for organizing documents - from mahmoudimus fork- **[pdf_extractor.py](../src/mcp_server_qdrant/pdf_extractor.py)**: `PDFPageExtractor` handles PDF text extraction and page label metadata using `pypdf`.
 
 ### Key Architectural Patterns
 
@@ -149,6 +149,12 @@ See [docs/RAG_ATTRIBUTION.md](../docs/RAG_ATTRIBUTION.md) for comprehensive docu
 - Bulk ingest CLI tool (`qdrant-ingest`)
 - Set-based filtering for knowledge base organization
 - Source: mahmoudimus/mcp-server-qdrant fork, Apache-2.0 license
+
+### PDF Page-by-Page Ingestion
+
+- **Async Pattern**: PDF extraction (pypdf) is synchronous; wrap in `asyncio.to_thread()` to maintain async-first architecture.
+- **Dual Page Numbering**: Metadata stores both `physical_page_index` (0-based sequential) and `page_label` (e.g., "i", "iv", "45") for accurate citation.
+- **Graceful Degradation**: Fallback to `Page N` format if page labels are missing.
 
 ### Chunking Strategies
 
