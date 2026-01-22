@@ -111,6 +111,7 @@ Look for `qdrant-find` in the returned mapping or list. Validate `inputSchema` (
 **Signature**: `qdrant-get-schema()` (no arguments)
 
 **Returns**: JSON with:
+
 - `collection_name`: Which collection is active
 - `storage_mode`: "memory", "local", or "remote"
 - `embedding`: Provider, model name, vector dimensions
@@ -120,6 +121,7 @@ Look for `qdrant-find` in the returned mapping or list. Validate `inputSchema` (
 **When to use**: ALWAYS call this FIRST before using `qdrant-find` to discover available filters dynamically.
 
 **Example response**:
+
 ```json
 {
   "collection_name": "my-docs",
@@ -159,14 +161,14 @@ Look for `qdrant-find` in the returned mapping or list. Validate `inputSchema` (
 
 ### qdrant-store: store information
 
-  - Signature: `qdrant-store(information: str, collection_name: str, metadata: dict | None = None)`
-  - Use to persist content + metadata (e.g., `document_id`, `page_label`, `physical_page_index`)
+- Signature: `qdrant-store(information: str, collection_name: str, metadata: dict | None = None)`
+- Use to persist content + metadata (e.g., `document_id`, `page_label`, `physical_page_index`)
 
 ### qdrant-find: search memories
 
-  - Signature: `qdrant-find(query: str, collection_name: str, [document_id], [physical_page_index], [page_label], ...)`
-  - Filters are optional; combine any subset of them to narrow results.
-  - **Pro tip**: Call `qdrant-get-schema` first to see exactly what filters are available!
+- Signature: `qdrant-find(query: str, collection_name: str, [document_id], [physical_page_index], [page_label], ...)`
+- Filters are optional; combine any subset of them to narrow results.
+- **Pro tip**: Call `qdrant-get-schema` first to see exactly what filters are available!
 
 ### Example: programmatic call
 

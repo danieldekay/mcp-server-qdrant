@@ -9,7 +9,6 @@ import asyncio
 import json
 import os
 
-from mcp_server_qdrant.embeddings.factory import create_embedding_provider
 from mcp_server_qdrant.mcp_server import QdrantMCPServer
 from mcp_server_qdrant.settings import (
     ChunkingSettings,
@@ -53,7 +52,7 @@ async def main():
         # Call the tool
         print("\n--- Calling qdrant-get-schema ---")
         result = await get_schema_tool.fn(DummyContext())
-        
+
         # Parse and pretty-print the result
         schema = json.loads(result)
         print("\n--- Server Schema ---")
@@ -71,10 +70,12 @@ async def main():
         # Display key information
         print(f"\nCollection: {schema['collection_name']}")
         print(f"Storage: {schema['storage_mode']}")
-        print(f"Embedding: {schema['embedding']['provider']} - {schema['embedding']['model']}")
+        print(
+            f"Embedding: {schema['embedding']['provider']} - {schema['embedding']['model']}"
+        )
         print(f"Vector size: {schema['embedding']['vector_size']}")
         print(f"Available filters: {len(schema['filters'])}")
-        for f in schema['filters']:
+        for f in schema["filters"]:
             print(f"  - {f['name']} ({f['type']}): {f['description']}")
 
     else:
