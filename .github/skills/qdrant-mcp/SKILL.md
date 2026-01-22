@@ -1,16 +1,17 @@
 ---
 name: qdrant-mcp
-description: "Practical guide for running and using the mcp-server-qdrant (Qdrant MCP server). Use when asked how to start the server, inspect MCP tool schemas, call `qdrant-find`/`qdrant-store`, configure PDF filters, or debug tool parameter exposure. Keywords: qdrant, mcp, fastmcp, qdrant-find, qdrant-store, pdf filters, inspector, ingestion"
+description: "Practical guide for running and using the mcp-server-qdrant (Qdrant MCP server). Use when asked how to start the server, inspect MCP tool schemas, call `qdrant-get-schema`/`qdrant-find`/`qdrant-store`, configure PDF filters, or debug tool parameter exposure. Keywords: qdrant, mcp, fastmcp, qdrant-find, qdrant-store, qdrant-get-schema, schema inspection, pdf filters, inspector, ingestion"
 license: Complete terms in LICENSE
 ---
 
 # Qdrant MCP: usage, inspection, and troubleshooting ✅
 
-This skill explains how to run the Qdrant MCP server, inspect tool schemas (UI or programmatically), call its tools (`qdrant-find`, `qdrant-store`), use PDF-related filters, and troubleshoot common issues.
+This skill explains how to run the Qdrant MCP server, inspect tool schemas (UI or programmatically), call its tools (`qdrant-get-schema`, `qdrant-find`, `qdrant-store`), use PDF-related filters, and troubleshoot common issues.
 
 ## When to use this skill
 
 - When you need to start or configure the MCP server for local development ⚙️
+- When you want to inspect or validate the current server configuration dynamically 🔍
 - When you want to inspect or validate a tool schema (e.g., confirm `document_id`/`page_label`) 🔎
 - When you want to store or search memories programmatically or via MCP clients 🧠
 - When diagnosing filter exposure or schema caching issues in clients (Inspector/VS Code/Claude) 🐞
@@ -103,13 +104,69 @@ Look for `qdrant-find` in the returned mapping or list. Validate `inputSchema` (
 
 ## Using the tools
 
-- qdrant-store: store information
+### qdrant-get-schema (NEW): Inspect current configuration 🔍
+
+**Purpose**: Discover what filters are available, what embedding model is active, and what collection you're connected to.
+
+**Signature**: `qdrant-get-schema()` (no arguments)
+
+**Returns**: JSON with:
+- `collection_name`: Which collection is active
+- `storage_mode`: "memory", "local", or "remote"
+- `embedding`: Provider, model name, vector dimensions
+- `filters`: List of available filterable fields with types and conditions
+- `rag_settings`: Chunking and PDF ingestion status
+
+**When to use**: ALWAYS call this FIRST before using `qdrant-find` to discover available filters dynamically.
+
+**Example response**:
+```json
+{
+  "collection_name": "my-docs",
+  "storage_mode": "local",
+  "embedding": {
+    "provider": "fastembed",
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "vector_size": 384,
+    "vector_name": "fastembed_384"
+  },
+  "filters": [
+    {
+      "name": "document_id",
+      "type": "keyword",
+      "description": "The unique identifier of the document",
+      "condition": "=="
+    },
+    {
+      "name": "physical_page_index",
+      "type": "integer",
+      "description": "The 0-based physical index of the page",
+      "condition": "=="
+    },
+    {
+      "name": "page_label",
+      "type": "keyword",
+      "description": "The original page numbering label (e.g., 'iv', '45')",
+      "condition": "=="
+    }
+  ],
+  "rag_settings": {
+    "chunking_enabled": false,
+    "pdf_ingestion_enabled": true
+  }
+}
+```
+
+### qdrant-store: store information
+
   - Signature: `qdrant-store(information: str, collection_name: str, metadata: dict | None = None)`
   - Use to persist content + metadata (e.g., `document_id`, `page_label`, `physical_page_index`)
 
-- qdrant-find: search memories
+### qdrant-find: search memories
+
   - Signature: `qdrant-find(query: str, collection_name: str, [document_id], [physical_page_index], [page_label], ...)`
   - Filters are optional; combine any subset of them to narrow results.
+  - **Pro tip**: Call `qdrant-get-schema` first to see exactly what filters are available!
 
 ### Example: programmatic call
 

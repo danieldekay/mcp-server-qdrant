@@ -221,3 +221,71 @@ class QdrantMCPServer(FastMCP):
                 name="qdrant-store",
                 description=self.tool_settings.tool_store_description,
             )
+
+        # Register get-schema tool for runtime configuration inspection
+        async def get_schema(ctx: Context) -> str:
+            """
+            Get the current server configuration schema.
+            Returns JSON with collection name, embedding provider details, filterable fields, and RAG settings.
+            :param ctx: The context for the request.
+            :return: JSON string containing the server schema.
+            """
+            await ctx.debug("Retrieving server schema configuration")
+
+            # Determine storage mode
+            storage_mode = "memory"
+            if self.qdrant_settings.local_path:
+                storage_mode = "local"
+            elif self.qdrant_settings.location and self.qdrant_settings.location != ":memory:":
+                storage_mode = "remote"
+
+            # Get embedding provider details
+            provider_type = (
+                self.embedding_provider_settings.provider_type.value
+                if self.embedding_provider_settings
+                else "unknown"
+            )
+            model_name = (
+                self.embedding_provider_settings.model_name
+                if self.embedding_provider_settings
+                else "unknown"
+            )
+            vector_size = self.embedding_provider.get_vector_size()
+            vector_name = self.embedding_provider.get_vector_name() or None
+
+            # Extract filterable fields
+            filters = []
+            if self.qdrant_settings.filterable_fields:
+                for field in self.qdrant_settings.filterable_fields:
+                    filters.append({
+                        "name": field.name,
+                        "type": field.field_type,
+                        "description": field.description,
+                        "condition": field.condition,
+                    })
+
+            # Build schema dictionary
+            schema = {
+                "collection_name": self.qdrant_settings.collection_name or "default",
+                "storage_mode": storage_mode,
+                "embedding": {
+                    "provider": provider_type,
+                    "model": model_name,
+                    "vector_size": vector_size,
+                    "vector_name": vector_name,
+                },
+                "filters": filters,
+                "rag_settings": {
+                    "chunking_enabled": self.chunking_settings.enable_chunking,
+                    "pdf_ingestion_enabled": True,  # Always enabled in current implementation
+                },
+            }
+
+            import json
+            return json.dumps(schema, indent=2)
+
+        self.tool(
+            get_schema,
+            name="qdrant-get-schema",
+            description="Get the current server configuration schema including collection name, embedding provider, filterable fields, and RAG settings. Use this to discover what filters are available before searching.",
+        )

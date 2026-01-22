@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-01-21
 
 ## Active Technologies
+- Python 3.10+ + FastMCP (server), Pydantic (settings), Qdrant Clien (003-get-schema-tool)
+- N/A (Read-only inspection of memory/settings) (003-get-schema-tool)
 
 - Python 3.10+ (CI tests against 3.10, 3.11, 3.12, 3.13) + FastMCP (MCP server framework), Qdrant AsyncQdrantClient, Pydantic (settings) (002-fix-pdf-filter-interface)
 
@@ -22,6 +24,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.10+ (CI tests against 3.10, 3.11, 3.12, 3.13): Follow standard conventions
 
 ## Recent Changes
+- 003-get-schema-tool: Added Python 3.10+ + FastMCP (server), Pydantic (settings), Qdrant Clien
 
 - 002-fix-pdf-filter-interface: Added Python 3.10+ (CI tests against 3.10, 3.11, 3.12, 3.13) + FastMCP (MCP server framework), Qdrant AsyncQdrantClient, Pydantic (settings)
 

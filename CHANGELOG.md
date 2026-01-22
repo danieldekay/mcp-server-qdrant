@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Schema Inspection Tool (2026-01-22)
+
+- **New `qdrant-get-schema` Tool** (`src/mcp_server_qdrant/mcp_server.py`)
+  - Runtime configuration inspection tool for MCP clients
+  - Returns JSON with collection name, storage mode, embedding provider details, filterable fields, and RAG settings
+  - Enables agents to dynamically discover available filters without guessing
+  - Zero-argument tool that always returns current server state
+  - Prevents hallucinations by providing ground truth about server capabilities
+
+- **Updated Agent Skill Documentation** (`.github/skills/qdrant-mcp/SKILL.md`)
+  - Added comprehensive usage guide for `qdrant-get-schema` tool
+  - Updated skill description with schema inspection keywords
+  - Emphasized workflow of calling get-schema before find operations
+  - Enhanced tool reference section with JSON response examples
+
+- **Example Script** (`examples/test_get_schema.py`)
+  - Demonstration of programmatic schema inspection
+  - Validates schema structure and required fields
+  - Shows how to parse and display filter information
+
 ### Added - PDF Page-by-Page Ingestion (2026-01-21)
 
 - **PDF Page-Level Extraction** (`src/mcp_server_qdrant/pdf_extractor.py`)
