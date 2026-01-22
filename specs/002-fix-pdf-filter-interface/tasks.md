@@ -27,25 +27,25 @@ Based on research findings, the Python code architecture is correct but filter p
 
 ### MCP Inspector Verification
 
-- [ ] T001 Start MCP Inspector and verify tool schema in browser at <http://localhost:5173>
-- [ ] T002 Check if document_id parameter appears in qdrant-find tool schema
-- [ ] T003 Check if physical_page_index parameter appears in qdrant-find tool schema
-- [ ] T004 Check if page_label parameter appears in qdrant-find tool schema
-- [ ] T005 Document actual vs expected tool schema in specs/002-fix-pdf-filter-interface/VERIFICATION_REPORT.md
+- [x] T001 Start MCP Inspector and verify tool schema in browser at <http://localhost:5173>
+- [x] T002 Check if document_id parameter appears in qdrant-find tool schema
+- [x] T003 Check if physical_page_index parameter appears in qdrant-find tool schema
+- [x] T004 Check if page_label parameter appears in qdrant-find tool schema
+- [x] T005 Document actual vs expected tool schema in specs/002-fix-pdf-filter-interface/VERIFICATION_REPORT.md
 
 ### Environment & Configuration Check
 
-- [X] T006 [P] Verify QDRANT_ALLOW_ARBITRARY_FILTER is not set to true in environment
-- [X] T007 [P] Verify COLLECTION_NAME environment variable configuration
-- [X] T008 [P] Verify filterable_fields has all three PDF metadata fields with conditions in QdrantSettings
-- [X] T009 [P] Check FastMCP version compatibility (run uv pip list | grep fastmcp)
+- [x] T006 [P] Verify QDRANT_ALLOW_ARBITRARY_FILTER is not set to true in environment
+- [x] T007 [P] Verify COLLECTION_NAME environment variable configuration
+- [x] T008 [P] Verify filterable_fields has all three PDF metadata fields with conditions in QdrantSettings
+- [x] T009 [P] Check FastMCP version compatibility (run uv pip list | grep fastmcp)
 
 ### Client Testing
 
-- [ ] T010 Restart MCP client completely (VS Code/Claude/Cursor) to clear any cached schemas
-- [ ] T011 Attempt to call qdrant-find with document_id parameter from MCP client
-- [ ] T012 Document whether parameter is visible in client UI and if call succeeds
-- [ ] T013 If call succeeds but parameter not visible, document as UI/display issue vs code issue
+- [x] T010 Restart MCP client completely (VS Code/Claude/Cursor) to clear any cached schemas
+- [x] T011 Attempt to call qdrant-find with document_id parameter from MCP client
+- [x] T012 Document whether parameter is visible in client UI and if call succeeds
+- [x] T013 If call succeeds but parameter not visible, document as UI/display issue vs code issue
 
 **Phase 1 Deliverable**: VERIFICATION_REPORT.md documenting whether filters work and where the issue lies
 
@@ -94,9 +94,9 @@ Based on research findings, the Python code architecture is correct but filter p
 
 ### End-to-End Validation
 
-- [X] T030 [US1] Create example script demonstrating document_id filtering in examples/pdf_filter_by_document.py
-- [ ] T031 [US1] Test example script with actual PDF ingestion and filtering
-- [ ] T032 [US1] Document document_id filter usage in quickstart.md if not already present
+- [x] T030 [US1] Create example script demonstrating document_id filtering in examples/pdf_filter_by_document.py
+- [x] T031 [US1] Test example script with actual PDF ingestion and filtering
+- [x] T032 [US1] Document document_id filter usage in quickstart.md if not already present
 
 **Phase 3 Deliverable**: Document ID filtering fully validated and documented
 

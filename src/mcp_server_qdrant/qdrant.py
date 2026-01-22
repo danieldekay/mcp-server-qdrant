@@ -127,7 +127,8 @@ class QdrantConnector:
                                 the default collection is used.
         """
         collection_name = collection_name or self._default_collection_name
-        assert collection_name is not None
+        if collection_name is None:
+            raise ValueError("Collection name must be provided")
         await self._ensure_collection_exists(collection_name)
 
         # Handle chunking if enabled
