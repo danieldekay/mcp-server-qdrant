@@ -1,0 +1,154 @@
+{
+    "toolName": "qdrant-find",
+    "description": "Look up memories in Qdrant. Use this tool when you need to: \\n - Find memories by their content \\n - Access memories for further analysis \\n - Get some personal information about the user \\n - Search for specific pages in documents using filters like 'document_id', 'physical_page_index', or 'page_label'",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "What to search for"
+            },
+            "collection_name": {
+                "type": "string",
+                "description": "The collection to search in"
+            },
+            "document_id": {
+                "anyOf": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "null"
+                    }
+                ],
+                "default": null,
+                "description": "The unique identifier of the document",
+                "title": "Document Id"
+            },
+            "physical_page_index": {
+                "anyOf": [
+                    {
+                        "type": "integer"
+                    },
+                    {
+                        "type": "null"
+                    }
+                ],
+                "default": null,
+                "description": "The 0-based physical index of the page",
+                "title": "Physical Page Index"
+            },
+            "page_label": {
+                "anyOf": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "type": "null"
+                    }
+                ],
+                "default": null,
+                "description": "The original page numbering label (e.g., 'iv', '45')",
+                "title": "Page Label"
+            }
+        },
+        "required": [
+            "query",
+            "collection_name"
+        ],
+        "title": "findArguments"
+    },
+    "notes": [
+        "This is the expected MCP tool schema when PDF filter parameters are correctly exposed.",
+        "All three filter parameters (document_id, physical_page_index, page_label) should appear as optional parameters with proper types and descriptions.",
+        "The 'anyOf' pattern with null allows FastMCP/Pydantic to handle Optional[Type] correctly.",
+        "Required parameters are only 'query' and 'collection_name' (unless collection_name is set via environment variable)."
+    ],
+    "testCases": [
+        {
+            "name": "Filter by document_id only",
+            "input": {
+                "query": "machine learning",
+                "collection_name": "papers",
+                "document_id": "ml-fundamentals.pdf"
+            },
+            "expectedBehavior": "Returns only results from ml-fundamentals.pdf"
+        },
+        {
+            "name": "Filter by physical_page_index only",
+            "input": {
+                "query": "introduction",
+                "collection_name": "papers",
+                "physical_page_index": 0
+            },
+            "expectedBehavior": "Returns only results from the first page (index 0) across all documents"
+        },
+        {
+            "name": "Filter by page_label only",
+            "input": {
+                "query": "abstract",
+                "collection_name": "papers",
+                "page_label": "i"
+            },
+            "expectedBehavior": "Returns results from pages labeled 'i' (Roman numeral 1)"
+        },
+        {
+            "name": "Combine document_id and physical_page_index",
+            "input": {
+                "query": "methodology",
+                "collection_name": "papers",
+                "document_id": "research-paper.pdf",
+                "physical_page_index": 5
+            },
+            "expectedBehavior": "Returns results from page 5 (6th physical page) of research-paper.pdf only"
+        },
+        {
+            "name": "Combine document_id and page_label",
+            "input": {
+                "query": "results",
+                "collection_name": "papers",
+                "document_id": "thesis.pdf",
+                "page_label": "42"
+            },
+            "expectedBehavior": "Returns results from the page labeled '42' in thesis.pdf"
+        },
+        {
+            "name": "No filters (backward compatibility)",
+            "input": {
+                "query": "quantum computing",
+                "collection_name": "papers"
+            },
+            "expectedBehavior": "Returns all matching results across all documents and pages"
+        },
+        {
+            "name": "Non-existent document_id",
+            "input": {
+                "query": "test",
+                "collection_name": "papers",
+                "document_id": "does-not-exist.pdf"
+            },
+            "expectedBehavior": "Returns empty result list (no errors)"
+        },
+        {
+            "name": "Invalid page index (out of range)",
+            "input": {
+                "query": "test",
+                "collection_name": "papers",
+                "physical_page_index": 9999
+            },
+            "expectedBehavior": "Returns empty result list (no errors)"
+        }
+    ],
+    "validationChecklist": [
+        "Tool appears in MCP client tool list",
+        "All 5 parameters visible in tool signature",
+        "Descriptions are clear and helpful",
+        "document_id accepts string values",
+        "physical_page_index accepts integer values only",
+        "page_label accepts string values",
+        "All filter parameters are optional (not required)",
+        "Tool can be called without any filter parameters",
+        "Tool can be called with any combination of filter parameters",
+        "Invalid parameter types are rejected with clear error messages"
+    ]
+}

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from pydantic_settings import BaseSettings
 
 from mcp_server_qdrant.constants import PDFMetadataKeys
@@ -107,6 +107,28 @@ class FilterableField(BaseModel):
     )
 
 
+DEFAULT_FILTERABLE_FIELDS = [
+    FilterableField(
+        name=PDFMetadataKeys.DOCUMENT_ID,
+        description="The unique identifier of the document",
+        field_type="keyword",
+        condition="==",
+    ),
+    FilterableField(
+        name=PDFMetadataKeys.PHYSICAL_PAGE_INDEX,
+        description="The 0-based physical index of the page",
+        field_type="integer",
+        condition="==",
+    ),
+    FilterableField(
+        name=PDFMetadataKeys.PAGE_LABEL,
+        description="The original page numbering label (e.g., 'iv', '45')",
+        field_type="keyword",
+        condition="==",
+    ),
+]
+
+
 class QdrantSettings(BaseSettings):
     """
     Configuration for the Qdrant connector.
@@ -122,27 +144,16 @@ class QdrantSettings(BaseSettings):
     read_only: bool = Field(default=False, validation_alias="QDRANT_READ_ONLY")
 
     filterable_fields: list[FilterableField] | None = Field(
-        default=[
-            FilterableField(
-                name=PDFMetadataKeys.DOCUMENT_ID,
-                description="The unique identifier of the document",
-                field_type="keyword",
-                condition="==",
-            ),
-            FilterableField(
-                name=PDFMetadataKeys.PHYSICAL_PAGE_INDEX,
-                description="The 0-based physical index of the page",
-                field_type="integer",
-                condition="==",
-            ),
-            FilterableField(
-                name=PDFMetadataKeys.PAGE_LABEL,
-                description="The original page numbering label (e.g., 'iv', '45')",
-                field_type="keyword",
-                condition="==",
-            ),
-        ]
+        default_factory=lambda: DEFAULT_FILTERABLE_FIELDS
     )
+
+    @field_validator("filterable_fields", mode="before")
+    @classmethod
+    def _ensure_filterable_fields(cls, v):
+        """Ensure filterable_fields is never None and return defaults when missing."""
+        if v is None:
+            return DEFAULT_FILTERABLE_FIELDS
+        return v
 
     allow_arbitrary_filter: bool = Field(
         default=False, validation_alias="QDRANT_ALLOW_ARBITRARY_FILTER"

@@ -107,3 +107,25 @@ class TestToolSettings:
         settings = ToolSettings()
         assert settings.tool_store_description == "Custom store description"
         assert settings.tool_find_description == "Custom find description"
+
+
+def test_filterable_fields_default_not_none():
+    """Verify QdrantSettings.filterable_fields default is applied and contains PDF fields."""
+    settings = QdrantSettings()
+    assert settings.filterable_fields is not None
+    assert len(settings.filterable_fields) >= 3
+    names = {f.name for f in settings.filterable_fields}
+    assert "document_id" in names
+    assert "physical_page_index" in names
+    assert "page_label" in names
+
+
+def test_filterable_fields_with_conditions():
+    """Verify filterable_fields_dict_with_conditions() returns all expected PDF fields."""
+    settings = QdrantSettings()
+    conditions = settings.filterable_fields_dict_with_conditions()
+    assert len(conditions) >= 3
+    assert "document_id" in conditions
+    assert "physical_page_index" in conditions
+    assert "page_label" in conditions
+    assert conditions["document_id"].condition == "=="

@@ -184,6 +184,17 @@ class QdrantMCPServer(FastMCP):
             self.qdrant_settings.filterable_fields_dict_with_conditions()
         )
 
+        # Diagnostic logging to help debug missing filter exposure in MCP schema
+        logger.info(
+            "Filterable fields: %s",
+            self.qdrant_settings.filterable_fields,
+        )
+        logger.info(
+            "Filterable conditions count: %d",
+            len(filterable_conditions),
+        )
+        logger.info("Filterable conditions: %s", filterable_conditions)
+
         if len(filterable_conditions) > 0:
             find_foo = wrap_filters(find_foo, filterable_conditions)
         elif not self.qdrant_settings.allow_arbitrary_filter:

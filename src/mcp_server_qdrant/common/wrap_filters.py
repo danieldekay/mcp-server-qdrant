@@ -28,7 +28,8 @@ def wrap_filters(
 
         query_filter = make_filter(filterable_fields, filter_values)
 
-        return original_func(**kwargs, query_filter=query_filter)
+        # Preserve positional args when calling the original function (e.g., ctx)
+        return original_func(*args, **kwargs, query_filter=query_filter)
 
     # Replace `query_filter` signature with parameters from `filterable_fields`
 
