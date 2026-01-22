@@ -254,27 +254,44 @@ async def test_page_label_schema_and_behavior(qdrant_connector):
     from mcp_server_qdrant.server import mcp
 
     tools = await mcp.get_tools()
-    find_tool = tools.get('qdrant-find') if isinstance(tools, dict) else next((t for t in tools if getattr(t, 'name', None) == 'qdrant-find'), None)
+    find_tool = (
+        tools.get("qdrant-find")
+        if isinstance(tools, dict)
+        else next((t for t in tools if getattr(t, "name", None) == "qdrant-find"), None)
+    )
     assert find_tool is not None
 
-    if hasattr(find_tool, 'parameters'):
-        props2 = find_tool.parameters.get('properties', {})
+    if hasattr(find_tool, "parameters"):
+        props2 = find_tool.parameters.get("properties", {})
     else:
         props2 = {}
 
-    label_schema = props2.get('page_label')
+    label_schema = props2.get("page_label")
     assert label_schema is not None
-    if 'type' in label_schema:
-        assert label_schema['type'] == 'string'
+    if "type" in label_schema:
+        assert label_schema["type"] == "string"
     else:
-        anyof = label_schema.get('anyOf', [])
-        types = {s.get('type') for s in anyof if isinstance(s, dict)}
-        assert 'string' in types
+        anyof = label_schema.get("anyOf", [])
+        types = {s.get("type") for s in anyof if isinstance(s, dict)}
+        assert "string" in types
 
     # Behavioral tests
-    a = Entry(content='Roman', metadata={'document_id': 'r', 'page_label': 'iv', 'physical_page_index': 3})
-    b = Entry(content='Num', metadata={'document_id': 'n', 'page_label': '45', 'physical_page_index': 44})
-    c = Entry(content='Spec', metadata={'document_id': 's', 'page_label': 'Appendix A', 'physical_page_index': 120})
+    a = Entry(
+        content="Roman",
+        metadata={"document_id": "r", "page_label": "iv", "physical_page_index": 3},
+    )
+    b = Entry(
+        content="Num",
+        metadata={"document_id": "n", "page_label": "45", "physical_page_index": 44},
+    )
+    c = Entry(
+        content="Spec",
+        metadata={
+            "document_id": "s",
+            "page_label": "Appendix A",
+            "physical_page_index": 120,
+        },
+    )
 
     await qdrant_connector.store(a)
     await qdrant_connector.store(b)
@@ -283,17 +300,19 @@ async def test_page_label_schema_and_behavior(qdrant_connector):
     settings = QdrantSettings()
     filterable = settings.filterable_fields_dict()
 
-    q_roman = make_filter(filterable, {'page_label': 'iv'})
-    r_roman = await qdrant_connector.search('Roman', query_filter=models.Filter(**q_roman))
-    assert len(r_roman) == 1 and r_roman[0].metadata.get('page_label') == 'iv'
+    q_roman = make_filter(filterable, {"page_label": "iv"})
+    r_roman = await qdrant_connector.search(
+        "Roman", query_filter=models.Filter(**q_roman)
+    )
+    assert len(r_roman) == 1 and r_roman[0].metadata.get("page_label") == "iv"
 
-    q_num = make_filter(filterable, {'page_label': '45'})
-    r_num = await qdrant_connector.search('Num', query_filter=models.Filter(**q_num))
-    assert len(r_num) == 1 and r_num[0].metadata.get('page_label') == '45'
+    q_num = make_filter(filterable, {"page_label": "45"})
+    r_num = await qdrant_connector.search("Num", query_filter=models.Filter(**q_num))
+    assert len(r_num) == 1 and r_num[0].metadata.get("page_label") == "45"
 
-    q_spec = make_filter(filterable, {'page_label': 'Appendix A'})
-    r_spec = await qdrant_connector.search('Spec', query_filter=models.Filter(**q_spec))
-    assert len(r_spec) == 1 and r_spec[0].metadata.get('page_label') == 'Appendix A'
+    q_spec = make_filter(filterable, {"page_label": "Appendix A"})
+    r_spec = await qdrant_connector.search("Spec", query_filter=models.Filter(**q_spec))
+    assert len(r_spec) == 1 and r_spec[0].metadata.get("page_label") == "Appendix A"
 
 
 @pytest.mark.asyncio

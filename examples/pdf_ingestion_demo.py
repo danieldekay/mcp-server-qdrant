@@ -21,7 +21,7 @@ async def main():
     print(f"Total pages: {len(pages)}")
 
     # 2. Setup Qdrant (in-memory for demo)
-    provider = FastEmbedProvider()
+    provider = FastEmbedProvider(model_name="sentence-transformers/all-MiniLM-L6-v2")
     connector = QdrantConnector(
         qdrant_url=":memory:",
         qdrant_api_key=None,
