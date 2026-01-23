@@ -9,7 +9,6 @@ from qdrant_client import models
 from mcp_server_qdrant.common.filters import make_indexes
 from mcp_server_qdrant.common.func_tools import make_partial_function
 from mcp_server_qdrant.common.wrap_filters import wrap_filters
-from mcp_server_qdrant.constants import PDFMetadataKeys
 from mcp_server_qdrant.embeddings.base import EmbeddingProvider
 from mcp_server_qdrant.embeddings.factory import create_embedding_provider
 from mcp_server_qdrant.formatters import EntryFormatter, XMLEntryFormatter
@@ -97,6 +96,55 @@ class QdrantMCPServer(FastMCP):
         :return: Formatted string
         """
         return self.entry_formatter.format(entry)
+
+    def _determine_storage_mode(self) -> str:
+        """
+        Determine the storage mode based on Qdrant settings.
+        :return: Storage mode: "memory", "local", or "remote"
+        """
+        if self.qdrant_settings.local_path:
+            return "local"
+        elif (
+            self.qdrant_settings.location
+            and self.qdrant_settings.location != ":memory:"
+        ):
+            return "remote"
+        return "memory"
+
+    def _get_embedding_provider_info(self) -> tuple[str, str]:
+        """
+        Extract embedding provider type and model name.
+        :return: Tuple of (provider_type, model_name)
+        """
+        provider_type = (
+            self.embedding_provider_settings.provider_type.value
+            if self.embedding_provider_settings
+            else "unknown"
+        )
+        model_name = (
+            self.embedding_provider_settings.model_name
+            if self.embedding_provider_settings
+            else "unknown"
+        )
+        return provider_type, model_name
+
+    def _extract_filterable_fields(self) -> list[dict[str, Any]]:
+        """
+        Extract filterable field configurations as dictionaries.
+        :return: List of filter field dictionaries
+        """
+        filters = []
+        if self.qdrant_settings.filterable_fields:
+            for field in self.qdrant_settings.filterable_fields:
+                filters.append(
+                    {
+                        "name": field.name,
+                        "type": field.field_type,
+                        "description": field.description,
+                        "condition": field.condition,
+                    }
+                )
+        return filters
 
     def setup_tools(self):
         """
@@ -215,9 +263,47 @@ class QdrantMCPServer(FastMCP):
         )
 
         if not self.qdrant_settings.read_only:
-            # Those methods can modify the database
             self.tool(
                 store_foo,
                 name="qdrant-store",
                 description=self.tool_settings.tool_store_description,
             )
+
+        async def get_schema(ctx: Context) -> str:
+            """
+            Get the current server configuration schema.
+            Returns JSON with collection name, embedding provider details, filterable fields, and RAG settings.
+            :param ctx: The context for the request.
+            :return: JSON string containing the server schema.
+            """
+            await ctx.debug("Retrieving server schema configuration")
+
+            storage_mode = self._determine_storage_mode()
+            provider_type, model_name = self._get_embedding_provider_info()
+            vector_size = self.embedding_provider.get_vector_size()
+            vector_name = self.embedding_provider.get_vector_name() or None
+            filters = self._extract_filterable_fields()
+
+            schema = {
+                "collection_name": self.qdrant_settings.collection_name or "default",
+                "storage_mode": storage_mode,
+                "embedding": {
+                    "provider": provider_type,
+                    "model": model_name,
+                    "vector_size": vector_size,
+                    "vector_name": vector_name,
+                },
+                "filters": filters,
+                "rag_settings": {
+                    "chunking_enabled": self.chunking_settings.enable_chunking,
+                    "pdf_ingestion_enabled": True,
+                },
+            }
+
+            return json.dumps(schema, indent=2)
+
+        self.tool(
+            get_schema,
+            name="qdrant-get-schema",
+            description="Get the current server configuration schema including collection name, embedding provider, filterable fields, and RAG settings. Use this to discover what filters are available before searching.",
+        )

@@ -1,0 +1,90 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QdrantGetSchemaOutput",
+    "type": "object",
+    "properties": {
+        "collection_name": {
+            "type": "string",
+            "description": "The name of the Qdrant collection"
+        },
+        "storage_mode": {
+            "type": "string",
+            "enum": [
+                "memory",
+                "local",
+                "remote"
+            ],
+            "description": "The storage backend in use"
+        },
+        "embedding": {
+            "type": "object",
+            "properties": {
+                "provider": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "vector_size": {
+                    "type": "integer"
+                },
+                "vector_name": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "provider",
+                "model",
+                "vector_size"
+            ]
+        },
+        "filters": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "condition": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "type",
+                    "description"
+                ]
+            }
+        },
+        "rag_settings": {
+            "type": "object",
+            "properties": {
+                "chunking_enabled": {
+                    "type": "boolean"
+                },
+                "pdf_ingestion_enabled": {
+                    "type": "boolean"
+                }
+            }
+        }
+    },
+    "required": [
+        "collection_name",
+        "storage_mode",
+        "embedding",
+        "filters"
+    ]
+}

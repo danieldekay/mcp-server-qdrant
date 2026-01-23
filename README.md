@@ -25,7 +25,11 @@ It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Genera
 
 ### Tools
 
-1. `qdrant-store`
+1. `qdrant-get-schema`
+   - Get the current server configuration schema
+   - Input: None
+   - Returns: JSON containing collection name, embedding provider details, filterable fields, and RAG settings
+2. `qdrant-store`
    - Store some information in the Qdrant database
    - Input:
      - `information` (string): Information to store
@@ -33,7 +37,7 @@ It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Genera
      - `collection_name` (string): Name of the collection to store the information in. This field is required if there are no default collection name.
                                    If there is a default collection name, this field is not enabled.
    - Returns: Confirmation message
-2. `qdrant-find`
+3. `qdrant-find`
    - Retrieve relevant information from the Qdrant database
    - Input:
      - `query` (string): Query to use for searching
