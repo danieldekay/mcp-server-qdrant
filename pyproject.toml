@@ -6,18 +6,24 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 dependencies = [
-    "fastembed>=0.6.0",
     "qdrant-client>=1.12.0",
     "pydantic>=2.10.6,<2.12.0",
+    "pydantic-settings>=2.0.0",
     "fastmcp>=2.7.0",
-    "model2vec==0.6.0",
-    "openai>=1.109.1",
-    "google-generativeai>=0.8.3",
-    "nltk>=3.8.1",
-    "tiktoken>=0.5.0",
-    "python-dotenv>=1.1.0",
     "pypdf>=5.1.0",
     "markitdown",
+    "python-dotenv>=1.1.0",
+]
+
+[project.optional-dependencies]
+fastembed = ["fastembed>=0.6.0"]
+openai = ["openai>=1.109.1"]
+gemini = ["google-generativeai>=0.8.3"]
+openrouter = ["openai>=1.109.1"]
+model2vec = ["model2vec==0.6.0"]
+chunking = ["nltk>=3.8.1", "tiktoken>=0.5.0"]
+all = [
+    "mcp-server-qdrant[fastembed,openai,gemini,openrouter,model2vec,chunking]",
 ]
 
 [build-system]
