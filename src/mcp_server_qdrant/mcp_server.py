@@ -298,6 +298,7 @@ class QdrantMCPServer(FastMCP):
                     "chunking_enabled": self.chunking_settings.enable_chunking,
                     "pdf_ingestion_enabled": True,
                 },
+                "collections": await self.qdrant_connector.get_collections_info(),
             }
 
             return json.dumps(schema, indent=2)
@@ -306,4 +307,157 @@ class QdrantMCPServer(FastMCP):
             get_schema,
             name="qdrant-get-schema",
             description="Get the current server configuration schema including collection name, embedding provider, filterable fields, and RAG settings. Use this to discover what filters are available before searching.",
+        )
+
+        if not self.qdrant_settings.read_only:
+
+            async def ingest_pdf(
+                ctx: Context,
+                file_path: Annotated[
+                    str, Field(description="Absolute path to the PDF file")
+                ],
+                collection_name: Annotated[
+                    str, Field(description="Target collection name")
+                ],
+                document_id: Annotated[
+                    str | None,
+                    Field(
+                        description="Document identifier (defaults to filename stem)"
+                    ),
+                ] = None,
+            ) -> str:
+                """
+                Ingest a PDF file page-by-page into the knowledge base.
+                Each page becomes a separate searchable entry with page metadata.
+                :param ctx: The context for the request.
+                :param file_path: Absolute path to the PDF file.
+                :param collection_name: Target collection name.
+                :param document_id: Optional document identifier.
+                :return: Summary of ingestion results.
+                """
+                import os
+                from pathlib import Path
+
+                from mcp_server_qdrant.pdf_extractor import PDFPageExtractor
+
+                pdf_path = Path(file_path)
+
+                # Path traversal protection
+                allowed_base = os.getenv("QDRANT_INGEST_BASE_PATH", "")
+                if allowed_base:
+                    resolved = str(pdf_path.resolve())
+                    if not resolved.startswith(
+                        str(Path(allowed_base).resolve())
+                    ):
+                        return (
+                            f"Error: Path outside allowed directory: "
+                            f"{allowed_base}"
+                        )
+
+                if not pdf_path.exists():
+                    return f"Error: File not found: {file_path}"
+                if not pdf_path.suffix.lower() == ".pdf":
+                    return f"Error: Not a PDF file: {file_path}"
+
+                doc_id = document_id or pdf_path.stem
+
+                await ctx.debug(
+                    f"Ingesting PDF '{pdf_path.name}' into '{collection_name}'"
+                )
+
+                extractor = PDFPageExtractor(str(pdf_path))
+                pages = await extractor.extract_all_pages()
+
+                ingested = 0
+                for content, physical_index, page_label in pages:
+                    if not content.strip():
+                        continue
+                    entry = Entry(
+                        content=content,
+                        metadata={
+                            "document_id": doc_id,
+                            "physical_page_index": physical_index,
+                            "page_label": page_label,
+                            "total_pages": len(pages),
+                            "filename": pdf_path.name,
+                        },
+                    )
+                    await self.qdrant_connector.store(
+                        entry, collection_name=collection_name
+                    )
+                    ingested += 1
+
+                return (
+                    f"Ingested {ingested}/{len(pages)} pages from "
+                    f"'{pdf_path.name}' into '{collection_name}'"
+                )
+
+            ingest_pdf_foo = ingest_pdf
+            if self.qdrant_settings.collection_name:
+                ingest_pdf_foo = make_partial_function(
+                    ingest_pdf_foo,
+                    {"collection_name": self.qdrant_settings.collection_name},
+                )
+
+            self.tool(
+                ingest_pdf_foo,
+                name="qdrant-ingest-pdf",
+                description=(
+                    "Ingest a PDF file page-by-page into the knowledge base. "
+                    "Each page is stored as a separate searchable entry with "
+                    "page number metadata."
+                ),
+            )
+
+        async def find_all(
+            ctx: Context,
+            query: Annotated[
+                str,
+                Field(description="Search query across all collections"),
+            ],
+            limit: Annotated[
+                int,
+                Field(description="Max results per collection"),
+            ] = 3,
+        ) -> list[str] | None:
+            """
+            Search across all collections in the Qdrant server.
+            :param ctx: The context for the request.
+            :param query: The search query.
+            :param limit: Max results per collection.
+            :return: Combined results from all collections.
+            """
+            collections = await self.qdrant_connector.get_collection_names()
+            if not collections:
+                return None
+
+            await ctx.debug(
+                f"Searching '{query}' across {len(collections)} collections"
+            )
+
+            all_results: list[str] = [
+                f"Results for '{query}' across {len(collections)} collections",
+            ]
+            for coll in collections:
+                entries = await self.qdrant_connector.search(
+                    query, collection_name=coll, limit=limit
+                )
+                for entry in entries:
+                    if entry.metadata is None:
+                        entry.metadata = {}
+                    entry.metadata["_collection"] = coll
+                    all_results.append(self.format_entry(entry))
+
+            if len(all_results) == 1:
+                return None
+            return all_results
+
+        self.tool(
+            find_all,
+            name="qdrant-find-all",
+            description=(
+                "Search across ALL collections in the knowledge base. "
+                "Use when you need to find content across multiple courses "
+                "or document sets."
+            ),
         )
