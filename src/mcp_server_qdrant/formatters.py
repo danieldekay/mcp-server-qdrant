@@ -52,6 +52,7 @@ class XMLEntryFormatter(EntryFormatter):
 
         metadata = entry.metadata or {}
         entry_metadata = json.dumps(metadata) if metadata else ""
+        score_attr = f' score="{entry.score:.3f}"' if entry.score is not None else ""
 
         if self._is_pdf_entry(metadata):
             document_id = metadata.get(PDFMetadataKeys.DOCUMENT_ID)
@@ -65,7 +66,7 @@ class XMLEntryFormatter(EntryFormatter):
             )
 
             return (
-                f"<entry>"
+                f"<entry{score_attr}>"
                 f"<content>{entry.content}</content>"
                 f"<page>Document: {document_id}, Page: {page_label}{physical_info}</page>"
                 f"<metadata>{entry_metadata}</metadata>"
@@ -73,7 +74,7 @@ class XMLEntryFormatter(EntryFormatter):
             )
 
         return (
-            f"<entry>"
+            f"<entry{score_attr}>"
             f"<content>{entry.content}</content>"
             f"<metadata>{entry_metadata}</metadata>"
             f"</entry>"
@@ -94,6 +95,9 @@ class JSONEntryFormatter(EntryFormatter):
         metadata = entry.metadata or {}
 
         result = {"content": entry.content, "metadata": metadata}
+
+        if entry.score is not None:
+            result["score"] = round(entry.score, 3)
 
         if self._is_pdf_entry(metadata):
             result["page_info"] = {
@@ -118,6 +122,8 @@ class PlainTextEntryFormatter(EntryFormatter):
         """
         metadata = entry.metadata or {}
 
+        score_info = f" [score: {entry.score:.3f}]" if entry.score is not None else ""
+
         if self._is_pdf_entry(metadata):
             document_id = metadata.get(PDFMetadataKeys.DOCUMENT_ID)
             page_label = metadata.get(PDFMetadataKeys.PAGE_LABEL)
@@ -130,12 +136,12 @@ class PlainTextEntryFormatter(EntryFormatter):
             )
 
             return (
-                f"--- Entry from {document_id}, Page {page_label}{physical_info} ---\n"
+                f"--- Entry from {document_id}, Page {page_label}{physical_info}{score_info} ---\n"
                 f"{entry.content}\n"
                 f"--- End Entry ---"
             )
 
-        return f"--- Entry ---\n{entry.content}\n--- End Entry ---"
+        return f"--- Entry{score_info} ---\n{entry.content}\n--- End Entry ---"
 
 
 class MarkdownEntryFormatter(EntryFormatter):
@@ -148,6 +154,7 @@ class MarkdownEntryFormatter(EntryFormatter):
         :return: Markdown-formatted string
         """
         metadata = entry.metadata or {}
+        score_info = f" (score: {entry.score:.3f})" if entry.score is not None else ""
 
         if self._is_pdf_entry(metadata):
             document_id = metadata.get(PDFMetadataKeys.DOCUMENT_ID)
@@ -161,9 +168,9 @@ class MarkdownEntryFormatter(EntryFormatter):
             )
 
             return (
-                f"## Entry: {document_id}, Page {page_label}{physical_info}\n\n"
+                f"## Entry: {document_id}, Page {page_label}{physical_info}{score_info}\n\n"
                 f"{entry.content}\n\n"
                 f"---\n"
             )
 
-        return f"## Entry\n\n{entry.content}\n\n---\n"
+        return f"## Entry{score_info}\n\n{entry.content}\n\n---\n"

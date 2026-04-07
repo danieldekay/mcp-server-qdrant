@@ -33,6 +33,7 @@ class Entry(BaseModel):
 
     content: str
     metadata: Metadata | None = None
+    score: float | None = None
 
 
 class PDFPageEntry(Entry):
@@ -117,6 +118,23 @@ class QdrantConnector:
         """
         response = await self._client.get_collections()
         return [collection.name for collection in response.collections]
+
+    async def get_collections_info(self) -> list[dict]:
+        """
+        Get statistics for all collections in the Qdrant server.
+        :return: A list of dicts with name, points_count, vectors_count, status.
+        """
+        collections = await self.get_collection_names()
+        result = []
+        for name in collections:
+            info = await self._client.get_collection(name)
+            result.append({
+                "name": name,
+                "points_count": info.points_count,
+                "vectors_count": info.vectors_count,
+                "status": info.status.value,
+            })
+        return result
 
     async def store(self, entry: Entry, *, collection_name: str | None = None):
         """
@@ -276,7 +294,7 @@ class QdrantConnector:
                 content = str(result.payload)
                 metadata = None
 
-            entries.append(Entry(content=content, metadata=metadata))
+            entries.append(Entry(content=content, metadata=metadata, score=result.score))
 
         return entries
 
