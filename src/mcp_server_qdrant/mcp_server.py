@@ -1024,3 +1024,90 @@ class QdrantMCPServer(FastMCP):
                     "QDRANT_ALLOW_DESTRUCTIVE_OPERATIONS=true."
                 ),
             )
+
+            async def replace_document(
+                ctx: Context,
+                information: Annotated[
+                    str,
+                    Field(description="Full document text to create or replace"),
+                ],
+                collection_name: Annotated[
+                    str,
+                    Field(description="Collection containing the document"),
+                ],
+                document_id: Annotated[
+                    str,
+                    Field(description="Stable document identifier"),
+                ],
+                metadata: Annotated[
+                    Metadata | None,
+                    Field(
+                        description=(
+                            "Metadata stored for the document, for example course_id, "
+                            "content_type, language, or chapter information."
+                        )
+                    ),
+                ] = None,
+            ) -> str:
+                """Create or replace a document as an idempotent upsert operation."""
+                self._enforce_collection_access(collection_name)
+                await ctx.debug(
+                    f"Replacing or creating document '{document_id}' in '{collection_name}'"
+                )
+
+                result = await self.qdrant_connector.upsert_document_entries(
+                    [Entry(content=information, metadata=metadata)],
+                    collection_name=collection_name,
+                    document_id=document_id,
+                )
+                return (
+                    f"Document '{document_id}' in '{collection_name}': {result['mode']} "
+                    f"(stored={result['stored']}, updated={result['updated']}, deleted={result['deleted']})"
+                )
+
+            async def update_document_metadata(
+                ctx: Context,
+                collection_name: Annotated[
+                    str,
+                    Field(description="Collection containing the document"),
+                ],
+                document_id: Annotated[
+                    str,
+                    Field(description="Document identifier to update"),
+                ],
+                metadata: Annotated[
+                    Metadata,
+                    Field(description="Metadata keys and values to merge into the document"),
+                ],
+            ) -> str:
+                """Update metadata for all chunks/pages of a document without re-embedding."""
+                self._enforce_collection_access(collection_name)
+                await ctx.debug(
+                    f"Updating metadata for document '{document_id}' in '{collection_name}'"
+                )
+                updated = await self.qdrant_connector.update_document_metadata(
+                    document_id,
+                    metadata,
+                    collection_name=collection_name,
+                )
+                return (
+                    f"Updated metadata for {updated} point(s) in document '{document_id}' "
+                    f"within '{collection_name}'."
+                )
+
+            self.tool(
+                replace_document,
+                name="qdrant-replace-document",
+                description=(
+                    "Create or replace a document idempotently. Unchanged content updates metadata only; "
+                    "changed content is reindexed."
+                ),
+            )
+
+            self.tool(
+                update_document_metadata,
+                name="qdrant-update-document-metadata",
+                description=(
+                    "Update metadata for all chunks/pages of a document without re-embedding the content."
+                ),
+            )

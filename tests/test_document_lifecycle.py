@@ -173,3 +173,48 @@ async def test_delete_by_filter_removes_subset(connector):
     assert deleted == 1
     assert len(remaining) == 1
     assert remaining[0].metadata["language"] == "en"
+
+
+@pytest.mark.asyncio
+async def test_update_document_metadata_updates_all_points(connector):
+    document_id = "course-pack.pdf"
+    entries = [
+        Entry(
+            content="Intro page",
+            metadata={
+                PDFMetadataKeys.DOCUMENT_ID: document_id,
+                PDFMetadataKeys.PAGE_LABEL: "1",
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: 0,
+            },
+        ),
+        Entry(
+            content="Methods page",
+            metadata={
+                PDFMetadataKeys.DOCUMENT_ID: document_id,
+                PDFMetadataKeys.PAGE_LABEL: "2",
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: 1,
+            },
+        ),
+    ]
+
+    await connector.upsert_document_entries(
+        entries,
+        collection_name=connector._default_collection_name,
+        document_id=document_id,
+    )
+
+    updated = await connector.update_document_metadata(
+        document_id,
+        {"course_id": "om-ws2026", "language": "de"},
+        collection_name=connector._default_collection_name,
+    )
+
+    results = await connector.search(
+        "page",
+        collection_name=connector._default_collection_name,
+    )
+
+    assert updated == 2
+    assert len(results) == 2
+    assert all(result.metadata["course_id"] == "om-ws2026" for result in results)
+    assert all(result.metadata["language"] == "de" for result in results)

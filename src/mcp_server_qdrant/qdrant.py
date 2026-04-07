@@ -580,6 +580,47 @@ class QdrantConnector:
             "deleted": deleted,
         }
 
+    async def update_document_metadata(
+        self,
+        document_id: str,
+        metadata_updates: Metadata,
+        *,
+        collection_name: str | None = None,
+    ) -> int:
+        """
+        Update metadata for all points belonging to a document.
+
+        Returns the number of updated points.
+        """
+        collection_name = collection_name or self._default_collection_name
+        if collection_name is None:
+            raise ValueError("Collection name must be provided")
+
+        points = await self.get_document_points(
+            document_id,
+            collection_name=collection_name,
+        )
+        if not points:
+            return 0
+
+        updated = 0
+        for point in points:
+            content, existing_metadata = self._extract_content_and_metadata(point.payload)
+            merged_metadata = dict(existing_metadata or {})
+            merged_metadata.update(metadata_updates)
+            canonical_payload = {
+                "document": content,
+                METADATA_PATH: merged_metadata,
+            }
+            await self._client.overwrite_payload(
+                collection_name=collection_name,
+                payload=canonical_payload,
+                points=[point.id],
+            )
+            updated += 1
+
+        return updated
+
     async def list_documents(self, collection_name: str | None = None) -> list[dict]:
         """
         Return a summary of all distinct documents in the collection.

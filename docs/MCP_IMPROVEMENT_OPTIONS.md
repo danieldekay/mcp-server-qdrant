@@ -22,6 +22,46 @@ The MCP server already supports a solid retrieval workflow:
 The strongest next step is to improve ranking quality, lifecycle management,
 ingestion reliability, and operational control.
 
+## Progress Update
+
+Status snapshot as of 2026-04-07:
+
+| Improvement | S | M | L | Notes |
+|---|---|---|---|---|
+| 1. Global ranked search across collections | Done | Open | Open | `qdrant-find-all` now ranks results globally and preserves source collection metadata. |
+| 2. Document lifecycle management | Done | Done | Open | Delete-by-document, delete-by-filter, replace-document, and metadata-only updates are implemented. |
+| 3. Answer-oriented retrieval | Done | Open | Open | Citation and reference formatting is standardized across result renderers. |
+| 4. Async ingestion jobs | Open | Open | Open | Not started yet. |
+| 5. Collection administration tools | Done | Open | Open | List, create, and delete collection tools are implemented. |
+| 6. Retrieval planning and filter UX | Done | Done | Open | `qdrant-get-schema` now returns examples, and query presets are available. |
+| 7. Payload and index consistency | Done | Open | Open | New writes use a canonical payload structure while legacy reads remain compatible. |
+| 8. Retrieval evaluation and regression testing | Done | Open | Open | Added Stichwortverzeichnis-based retrieval regression tests. |
+| 9. Performance and cost controls | Done | Open | Open | Content hashing and idempotent re-import behavior are implemented. |
+| 10. Security, tenancy, and auditability | Done | Open | Open | Added collection allowlists and destructive-operation guards. |
+
+Current validation baseline:
+
+- Full test suite passes: `229 passed`
+- New lifecycle, admin, and retrieval features are covered by focused MCP and connector tests
+- Retrieval regression coverage now includes index-derived golden queries
+
+Implemented in the current branch:
+
+- Global ranking for `qdrant-find-all`
+- Standardized reference/citation formatting across XML, JSON, plain text, and Markdown outputs
+- Collection admin tools: list, create, delete
+- Query presets: `balanced`, `precision`, `recall`
+- Schema examples returned by `qdrant-get-schema`
+- Idempotent document upserts with content hashing
+- Document lifecycle tools: replace document, update metadata, delete document, delete by filter
+- Stichwortverzeichnis-based retrieval regression tests
+
+Still open from the roadmap:
+
+- All of improvement 4
+- All remaining `L` items
+- Remaining `M` items for 1, 3, 5, 7, 8, 9, and 10
+
 ## Proposed Improvements
 
 ### 1. Global Ranked Search Across Collections
@@ -137,7 +177,16 @@ need stronger write controls, isolation, and observability.
 - **L**: Add real tenant isolation with scoped access, authenticated sessions,
   and administrative audit trails.
 
-## Recommended Priority
+## Remaining Priority
+
+The original top priorities were correct, but most of the first selected wave
+is now complete. The highest-leverage remaining work is:
+
+1. Async ingestion jobs and resumable processing
+2. Better answer-oriented retrieval beyond formatted chunks
+3. Higher-order ranking quality work such as fusion and reranking
+
+## Original Recommendation
 
 If only three improvements should move forward first, these provide the best
 product leverage:

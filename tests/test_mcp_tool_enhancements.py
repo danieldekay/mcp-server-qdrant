@@ -173,3 +173,75 @@ async def test_collection_allowlist_blocks_mutation():
 
     with pytest.raises(ValueError, match="is not allowed"):
         await create_tool.fn(DummyCtx(), collection_name="blocked-course")
+
+
+@pytest.mark.asyncio
+async def test_replace_document_tool_uses_idempotent_upsert():
+    server = make_server()
+    replace_tool = await get_tool(server, "qdrant-replace-document")
+
+    created = await replace_tool.fn(
+        DummyCtx(),
+        information="Course overview and grading policy",
+        collection_name="course-docs",
+        document_id="syllabus.md",
+        metadata={"course_id": "om-ws2026"},
+    )
+    updated = await replace_tool.fn(
+        DummyCtx(),
+        information="Course overview and grading policy",
+        collection_name="course-docs",
+        document_id="syllabus.md",
+        metadata={"course_id": "om-ws2026", "language": "de"},
+    )
+
+    search_results = await server.qdrant_connector.search(
+        "grading policy",
+        collection_name="course-docs",
+    )
+
+    assert "created" in created
+    assert "metadata_updated" in updated
+    assert len(search_results) == 1
+    assert search_results[0].metadata["language"] == "de"
+
+
+@pytest.mark.asyncio
+async def test_update_document_metadata_tool_updates_existing_points():
+    server = make_server()
+    replace_tool = await get_tool(server, "qdrant-replace-document")
+    update_tool = await get_tool(server, "qdrant-update-document-metadata")
+
+    await replace_tool.fn(
+        DummyCtx(),
+        information="Capacity planning overview",
+        collection_name="course-docs",
+        document_id="chapter-7.md",
+        metadata={"content_type": "notes"},
+    )
+
+    response = await update_tool.fn(
+        DummyCtx(),
+        collection_name="course-docs",
+        document_id="chapter-7.md",
+        metadata={"course_id": "om-ws2026", "language": "de"},
+    )
+    search_results = await server.qdrant_connector.search(
+        "capacity planning",
+        collection_name="course-docs",
+    )
+
+    assert "Updated metadata for 1 point(s)" in response
+    assert search_results[0].metadata["course_id"] == "om-ws2026"
+    assert search_results[0].metadata["language"] == "de"
+
+
+@pytest.mark.asyncio
+async def test_new_tool_schema_includes_document_lifecycle_tools():
+    server = make_server()
+    tools = await server.get_tools()
+    if not isinstance(tools, dict):
+        tools = {tool.name: tool for tool in tools}
+
+    assert "qdrant-replace-document" in tools
+    assert "qdrant-update-document-metadata" in tools
