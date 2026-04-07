@@ -178,6 +178,26 @@ async def ingest_pdf_file(
 
         logger.info(f"Ingesting {total_pages} pages from: {file_path}")
 
+        # M11: Extract outline and document metadata
+        outline = await extractor.extract_outline()
+        doc_meta = await extractor.extract_document_metadata()
+        if outline:
+            logger.info(f"Found {len(outline)} outline entries in {file_path.name}")
+
+        # M12: Detect and parse back-of-book index (Stichwortverzeichnis)
+        page_to_terms: dict[int, list[str]] = {}
+        index_start = PDFPageExtractor.detect_index_start(outline, pages_data)
+        if index_start is not None:
+            logger.info(f"Index detected starting at page {index_start} in {file_path.name}")
+            # Collect text from index pages
+            index_text = "\n".join(
+                content for content, idx, _label in pages_data if idx >= index_start
+            )
+            index_entries = PDFPageExtractor.parse_index_entries(index_text)
+            if index_entries:
+                page_to_terms = PDFPageExtractor.build_page_to_terms_map(index_entries)
+                logger.info(f"Parsed {len(index_entries)} index terms from {file_path.name}")
+
         for content, physical_index, page_label in pages_data:
             if not content.strip():
                 logger.debug(
@@ -192,6 +212,25 @@ async def ingest_pdf_file(
                 PDFMetadataKeys.EXTENSION: file_path.suffix,
                 **metadata,
             }
+
+            # M11: Add chapter and document metadata
+            if outline:
+                chapter = PDFPageExtractor.get_chapter_for_page(outline, physical_index)
+                if chapter:
+                    file_metadata[PDFMetadataKeys.CHAPTER_TITLE] = chapter
+            if doc_meta.get("title"):
+                file_metadata[PDFMetadataKeys.DOCUMENT_TITLE] = doc_meta["title"]
+            if doc_meta.get("author"):
+                file_metadata[PDFMetadataKeys.DOCUMENT_AUTHOR] = doc_meta["author"]
+
+            # M12: Add index terms for this page (by page label)
+            try:
+                page_num = int(page_label)
+                terms = page_to_terms.get(page_num, [])
+                if terms:
+                    file_metadata[PDFMetadataKeys.INDEX_TERMS] = terms
+            except (ValueError, TypeError):
+                pass
 
             # Create PDFPageEntry
             entry = PDFPageEntry(
