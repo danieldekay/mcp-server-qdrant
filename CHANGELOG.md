@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Teaching & Research Enhancements (2026-04-07)
+
+- **Teaching Metadata Schema** (`src/mcp_server_qdrant/constants.py`, `src/mcp_server_qdrant/settings.py`)
+  - Added support for `course_id`, `chapter`, `textbook`, `content_type`, and `language` metadata fields.
+  - Automatically registers these fields as filterable in Qdrant collections.
+  
+- **New Embedding Providers** (`src/mcp_server_qdrant/embeddings/`)
+  - **Google Gemini**: Support for `models/embedding-001` and `models/text-embedding-004` (requires `GOOGLE_API_KEY`).
+  - **OpenRouter**: Access to 18+ models (OpenAI, Gemini, Mistral, BGE) via a single OpenAI-compatible API (requires `OPENROUTER_API_KEY`).
+  
+- **Search Result Scores** (`src/mcp_server_qdrant/qdrant.py`, `src/mcp_server_qdrant/formatters.py`)
+  - Added `score` field to search results.
+  - Updated XML, JSON, Markdown, and PlainText formatters to include relevance scores in output.
+
+- **Advanced Search Tools** (`src/mcp_server_qdrant/mcp_server.py`)
+  - **`qdrant-find-all`**: Cross-collection search tool for querying multiple namespaces simultaneously.
+  - **`qdrant-ingest-pdf`**: Specialized MCP tool for recursive PDF ingestion with page-level tracking.
+
+- **Enhanced Collection Stats** (`src/mcp_server_qdrant/mcp_server.py`)
+  - Updated `qdrant-get-schema` to include live point counts and vector dimensions for all collections.
+
+### Changed - Upstream Merge v0.8.1 (2026-04-07)
+
+- Merged official `qdrant-official/master` (v0.8.1).
+- Pinned `pydantic` to `<2.12.0` and `fastmcp` to `>=2.7.0` for stability.
+- Updated CI/CD to use specific commit SHAs for all GitHub Actions.
+- Refactored optional dependency groups in `pyproject.toml` (fastembed, openai, gemini, openrouter, model2vec, chunking).
+
 ### Added - Schema Inspection Tool (2026-01-22)
 
 - **New `qdrant-get-schema` Tool** (`src/mcp_server_qdrant/mcp_server.py`)

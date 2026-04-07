@@ -18,7 +18,11 @@ It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Genera
 - **Intelligent Document Chunking** - Automatically split large documents using semantic, sentence, or fixed strategies
 - **Bulk Document Ingestion** - CLI tool for ingesting entire directories of documents
 - **Set-Based Organization** - Organize documents into knowledge bases with semantic filtering
-- **Multiple Embedding Providers** - Support for FastEmbed, Model2Vec, OpenAI-compatible, and Gemini
+- **Multiple Embedding Providers** - Support for FastEmbed, Model2Vec, OpenAI-compatible, Gemini, and OpenRouter
+- **Collection Statistics** - Track point counts and vector dimensions for all collections in `get-schema`
+- **Result Relevance Scores** - All search results include numeric relevance scores
+- **Teaching Metadata Schema** - Built-in support for `course_id`, `chapter`, `textbook`, `content_type`, and `language` filtering
+- **Multi-Collection Search** - Query across multiple namespaces with `qdrant-find-all`
 - **Hybrid Search** - Combine dense and sparse vectors for improved retrieval accuracy
 
 ## Components
@@ -28,22 +32,32 @@ It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Genera
 1. `qdrant-get-schema`
    - Get the current server configuration schema
    - Input: None
-   - Returns: JSON containing collection name, embedding provider details, filterable fields, and RAG settings
+   - Returns: JSON containing collection name, embedding provider details, filterable fields, RAG settings, and **live statistics (point count, vector size)** for all collections
 2. `qdrant-store`
    - Store some information in the Qdrant database
    - Input:
      - `information` (string): Information to store
-     - `metadata` (JSON): Optional metadata to store
-     - `collection_name` (string): Name of the collection to store the information in. This field is required if there are no default collection name.
-                                   If there is a default collection name, this field is not enabled.
+     - `metadata` (JSON): Optional metadata (e.g., `course_id`, `chapter`, `textbook`)
+     - `collection_name` (string): Name of the collection to store the information in.
    - Returns: Confirmation message
 3. `qdrant-find`
    - Retrieve relevant information from the Qdrant database
    - Input:
      - `query` (string): Query to use for searching
-     - `collection_name` (string): Name of the collection to store the information in. This field is required if there are no default collection name.
-                                   If there is a default collection name, this field is not enabled.
-   - Returns: Information stored in the Qdrant database as separate messages
+     - `collection_name` (string): Name of the collection to search in
+   - Returns: Scored search results formatted as separate messages
+4. `qdrant-find-all`
+   - Search across all collections simultaneously
+   - Input:
+     - `query` (string): Query to use for searching
+     - `limit` (number): Max results per collection
+   - Returns: Merged and scored search results from multiple collections
+5. `qdrant-ingest-pdf`
+   - Recursive PDF ingestion tool
+   - Input:
+     - `path` (string): File or directory path to ingest
+     - `collection_name` (string): Target collection
+   - Returns: Ingestion summary (pages processed)
 
 ## Environment Variables
 
@@ -57,14 +71,17 @@ The configuration of the server is done using environment variables:
 | `COLLECTION_NAMES`              | List of collection names for multiple collections support           | None                                                              |
 | `QDRANT_LOCAL_PATH`             | Path to the local Qdrant database (alternative to `QDRANT_URL`)     | None                                                              |
 | `QDRANT_READ_ONLY`              | Enable read-only mode (disables write operations)                   | `false`                                                           |
-| `EMBEDDING_PROVIDER`            | Embedding provider: "fastembed", "model2vec", "oai_compat", "openai", or "gemini" | `fastembed`                                                       |
+| `EMBEDDING_PROVIDER`            | Choice: "fastembed", "model2vec", "oai_compat", "openai", "gemini", or "openrouter" | `fastembed`                                                       |
 | `EMBEDDING_MODEL`               | Name of the embedding model to use                                  | `sentence-transformers/all-MiniLM-L6-v2`                          |
 | `USE_UNNAMED_VECTORS`           | Use Qdrant's unnamed vector field instead of named vectors          | `false`                                                           |
 | `SPARSE_EMBEDDING_MODEL`        | Sparse embedding model for hybrid search                            | None                                                              |
 | `OAI_COMPAT_ENDPOINT`           | OpenAI-compatible API endpoint URL                                  | `https://api.openai.com/v1`                                       |
 | `OAI_COMPAT_API_KEY`            | API key for OpenAI-compatible endpoint                              | None                                                              |
 | `OAI_COMPAT_VEC_SIZE`           | Vector size override for OpenAI-compatible embeddings               | None (auto-detected)                                              |
-| `GEMINI_API_KEY`                | API key for Google Gemini embeddings                                | None                                                              |
+| `GEMINI_API_KEY`                | API key for Google Gemini embeddings (requires `GOOGLE_API_KEY`)    | None                                                              |
+| `OPENROUTER_API_KEY`            | API key for OpenRouter embeddings                                   | None                                                              |
+| `OPENROUTER_EMBEDDING_DIMENSIONS` | Vector size override for unknown OpenRouter models                | None                                                              |
+| `QDRANT_INGEST_BASE_PATH`       | Restrict `qdrant-ingest-pdf` to this root directory                 | Current working directory                                         |
 | `ENABLE_CHUNKING`               | Enable automatic document chunking for RAG                          | `false`                                                           |
 | `MAX_CHUNK_SIZE`                | Maximum chunk size in tokens/characters                             | `512`                                                             |
 | `CHUNK_OVERLAP`                 | Overlap between consecutive chunks                                  | `50`                                                              |
