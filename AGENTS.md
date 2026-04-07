@@ -9,7 +9,7 @@
 - Python 3.10+ with async/await patterns
 - FastMCP for MCP server implementation
 - Qdrant vector database (AsyncQdrantClient)
-- Multiple embedding providers: FastEmbed, OpenAI, Model2Vec, Gemini
+- Embedding providers: FastEmbed (default), OpenAI
 - RAG features: document chunking, bulk ingestion, set-based filtering
 - Pydantic for settings and validation
 
@@ -35,7 +35,7 @@ uv sync
 ```bash
 export QDRANT_URL="http://localhost:6333"
 export COLLECTION_NAME="my-collection"
-export EMBEDDING_PROVIDER="fastembed"  # or "openai", "model2vec", "gemini"
+export EMBEDDING_PROVIDER="fastembed"  # or "openai"
 export EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"
 ```
 
@@ -336,10 +336,9 @@ Optional:
 
 Embedding configuration:
 
-- `EMBEDDING_PROVIDER` - Provider type: `fastembed`, `openai`, `model2vec`, `gemini` (default: `fastembed`)
+- `EMBEDDING_PROVIDER` - Provider type: `fastembed` oder `openai` (default: `fastembed`)
 - `EMBEDDING_MODEL` - Model name (default: `sentence-transformers/all-MiniLM-L6-v2`)
 - `OPENAI_API_KEY` - Required for OpenAI provider
-- `GEMINI_API_KEY` - Required for Gemini provider
 
 RAG features:
 

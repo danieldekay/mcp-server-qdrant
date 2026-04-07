@@ -3,18 +3,21 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator, field_validator
 from pydantic_settings import BaseSettings
 
-from mcp_server_qdrant.constants import PDFMetadataKeys
+from mcp_server_qdrant.constants import PDFMetadataKeys, TeachingMetadataKeys
 from mcp_server_qdrant.embeddings.types import EmbeddingProviderType
 
 DEFAULT_TOOL_STORE_DESCRIPTION = (
-    "Keep the memory for later use, when you are asked to remember something."
+    "Store teaching material or lecture content in the knowledge base. "
+    "Use when indexing textbook content, lecture notes, or academic resources. "
+    "Include metadata like document_id, page_label, chapter, and course name."
 )
 DEFAULT_TOOL_FIND_DESCRIPTION = (
-    "Look up memories in Qdrant. Use this tool when you need to: \n"
-    " - Find memories by their content \n"
-    " - Access memories for further analysis \n"
-    " - Get some personal information about the user \n"
-    " - Search for specific pages in documents using filters like 'document_id', 'physical_page_index', or 'page_label'"
+    "Search the teaching materials knowledge base (Qdrant). Use when you need to:\n"
+    " - Find textbook content by topic or concept\n"
+    " - Locate specific pages, chapters, or figures in indexed documents\n"
+    " - Assess which sources cover a given learning objective\n"
+    " - Search for specific pages using filters: 'document_id', 'page_label'\n"
+    "Returns scored results with source references."
 )
 
 METADATA_PATH = "metadata"
@@ -82,6 +85,11 @@ class PdfIngestionSettings(BaseSettings):
         default=True,
         validation_alias="ENABLE_PDF_INGESTION",
     )
+    extraction_mode: Literal["plain", "layout"] = Field(
+        default="plain",
+        validation_alias="PDF_EXTRACTION_MODE",
+        description="'plain' (default) or 'layout' (preserves horizontal positioning)",
+    )
 
 
 class FilterableField(BaseModel):
@@ -123,6 +131,24 @@ DEFAULT_FILTERABLE_FIELDS = [
     FilterableField(
         name=PDFMetadataKeys.PAGE_LABEL,
         description="The original page numbering label (e.g., 'iv', '45')",
+        field_type="keyword",
+        condition="==",
+    ),
+    FilterableField(
+        name=TeachingMetadataKeys.COURSE_ID,
+        description="Course identifier (e.g. 'om-ws2026')",
+        field_type="keyword",
+        condition="==",
+    ),
+    FilterableField(
+        name=TeachingMetadataKeys.CONTENT_TYPE,
+        description="Type of content: textbook, slides, notes, exercises",
+        field_type="keyword",
+        condition="==",
+    ),
+    FilterableField(
+        name=TeachingMetadataKeys.LANGUAGE,
+        description="Language of the content (e.g. 'de', 'en')",
         field_type="keyword",
         condition="==",
     ),
