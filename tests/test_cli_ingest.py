@@ -80,9 +80,15 @@ class TestIngestFile:
         f.write_text("Hello World")
 
         connector = AsyncMock()
+        connector.upsert_document_entries.return_value = {
+            "mode": "created",
+            "stored": 1,
+            "updated": 0,
+            "deleted": 0,
+        }
         result = await ingest_file(f, connector, "test_collection", {})
         assert result is True
-        connector.store.assert_called_once()
+        connector.upsert_document_entries.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_ingest_empty_file_returns_false(self, tmp_path):
@@ -92,7 +98,7 @@ class TestIngestFile:
         connector = AsyncMock()
         result = await ingest_file(f, connector, "test_collection", {})
         assert result is False
-        connector.store.assert_not_called()
+        connector.upsert_document_entries.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_ingest_whitespace_file_returns_false(self, tmp_path):
@@ -109,14 +115,21 @@ class TestIngestFile:
         f.write_text("print('hello')")
 
         connector = AsyncMock()
+        connector.upsert_document_entries.return_value = {
+            "mode": "created",
+            "stored": 1,
+            "updated": 0,
+            "deleted": 0,
+        }
         metadata = {"doc_type": "code", "knowledge_base": "test"}
         result = await ingest_file(f, connector, "test_collection", metadata)
         assert result is True
 
         # Check metadata passed
-        call_args = connector.store.call_args
-        entry = call_args[0][0]
+        call_args = connector.upsert_document_entries.call_args
+        entry = call_args[0][0][0]
         assert entry.metadata["doc_type"] == "code"
+        assert call_args.kwargs["document_id"] == "test.py"
 
     @pytest.mark.asyncio
     async def test_ingest_file_store_error(self, tmp_path):
@@ -124,6 +137,6 @@ class TestIngestFile:
         f.write_text("content")
 
         connector = AsyncMock()
-        connector.store.side_effect = Exception("Connection failed")
+        connector.upsert_document_entries.side_effect = Exception("Connection failed")
         result = await ingest_file(f, connector, "test_collection", {})
         assert result is False

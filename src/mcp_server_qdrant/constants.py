@@ -28,3 +28,9 @@ class TeachingMetadataKeys:
     TEXTBOOK = "textbook"
     CONTENT_TYPE = "content_type"
     LANGUAGE = "language"
+
+
+class SystemMetadataKeys:
+    """Internal metadata keys used for ingestion and lifecycle operations."""
+
+    CONTENT_HASH = "content_hash"

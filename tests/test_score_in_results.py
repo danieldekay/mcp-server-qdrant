@@ -91,6 +91,41 @@ class TestScoreInFormatters:
         result = MarkdownEntryFormatter().format(scored_entry)
         assert "(score: 0.873)" in result
 
+    def test_plain_text_formatter_includes_reference_metadata(self):
+        entry = Entry(
+            content="reference content",
+            metadata={
+                "_collection": "ops-course",
+                PDFMetadataKeys.DOCUMENT_ID: "ops.pdf",
+                PDFMetadataKeys.PAGE_LABEL: "42",
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: 41,
+                "chapter_title": "Capacity Planning",
+            },
+            score=0.904,
+        )
+
+        result = PlainTextEntryFormatter().format(entry)
+        assert "Collection: ops-course" in result
+        assert "Document: ops.pdf" in result
+        assert "Chapter: Capacity Planning" in result
+
+    def test_json_formatter_includes_reference_block(self):
+        import json
+
+        entry = Entry(
+            content="reference content",
+            metadata={
+                "_collection": "ops-course",
+                PDFMetadataKeys.DOCUMENT_ID: "ops.pdf",
+                PDFMetadataKeys.PAGE_LABEL: "42",
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: 41,
+            },
+        )
+
+        result = json.loads(JSONEntryFormatter().format(entry))
+        assert result["reference"]["collection"] == "ops-course"
+        assert result["reference"]["document_id"] == "ops.pdf"
+
 
 class TestScoreFromQdrantSearch:
     """Integration test: score populated from actual Qdrant search."""

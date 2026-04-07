@@ -4,6 +4,11 @@ This directory contains comprehensive documentation for the mcp-server-qdrant pr
 
 ## Main Documentation
 
+- **[MCP_IMPROVEMENT_OPTIONS.md](MCP_IMPROVEMENT_OPTIONS.md)** - Prioritized roadmap ideas for the MCP server
+  - Current functionality summary
+  - 10 proposed improvements with S, M, and L versions
+  - Recommended implementation priorities
+
 - **[OPENAI_IMPLEMENTATION.md](OPENAI_IMPLEMENTATION.md)** - OpenAI embedding provider implementation details
   - How to use OpenAI embeddings with existing databases
   - Configuration examples and compatibility matrix

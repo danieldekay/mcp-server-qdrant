@@ -13,11 +13,16 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Pattern for detecting index entries: "Term, 123, 456-789" or "Term 123f."
+# Pattern for detecting index entries: "Term  123, 456-789" or "Term, 123" or "Term 123f."
+# Group 1: term text (stops before trailing page numbers)
+# Group 2: page refs (digits, ranges, f./ff., comma-separated)
 INDEX_ENTRY_PATTERN = re.compile(
-    r"^(.+?)\s*[,]\s*(\d+(?:\s*[-–—]\s*\d+)?(?:\s*[,;]\s*\d+(?:\s*[-–—]\s*\d+)?)*)\s*$",
+    r"^(.*?)\s+"
+    r"(\d+(?:f{1,2}\.?)?(?:\s*[,;]\s*\d+(?:f{1,2}\.?)?|\s*[-–—]\s*\d+(?:f{1,2}\.?)?)*)\s*$",
     re.MULTILINE,
 )
+# Characters that mark a sub-entry in German academic indexes (indent with dash/bullet)
+_SUBENTRY_RE = re.compile(r"^([\s]*[–—4]\s*[-]?)")
 
 # Keywords that signal the start of a back-of-book index
 INDEX_HEADING_KEYWORDS = [
@@ -246,18 +251,29 @@ class PDFPageExtractor:
         """
         Detect the starting page of a back-of-book index (Stichwortverzeichnis).
 
-        Strategy A: Check outline/bookmarks for index heading keywords.
+        Strategy A: Check outline/bookmarks for index heading keywords,
+                    but only in the last 15% of the document to avoid false
+                    positives from table-of-contents entries mid-book.
         Strategy B (fallback): Scan last 10% of pages for heading patterns.
 
         :param outline: Parsed outline from extract_outline()
         :param pages_data: All pages data (content, index, label) for heuristic fallback
         :return: 0-based page index where the index starts, or None
         """
-        # Strategy A: bookmarks
+        # Strategy A: bookmarks — restricted to last 15% to avoid false positives
+        # from ToC entries or chapter headers that contain index keywords mid-book
+        total_pages = len(pages_data) if pages_data else 0
+        min_index_page = int(total_pages * 0.85) if total_pages > 0 else 0
+
         for item in outline:
             title_lower = item.get("title", "").lower()
+            page_index = item.get("page_index")
+            if page_index is None:
+                continue
+            if page_index < min_index_page:
+                continue
             if any(kw in title_lower for kw in INDEX_HEADING_KEYWORDS):
-                return item.get("page_index")
+                return page_index
 
         # Strategy B: heuristic scan of last pages
         if pages_data:
@@ -274,24 +290,62 @@ class PDFPageExtractor:
     def parse_index_entries(text: str) -> dict[str, list[int | tuple[int, int]]]:
         """
         Parse index entries from raw text of index pages.
-        Expects lines like: "Machine Learning, 45, 67-72, 134"
+        Handles German Springer-style indexes:
+          - Space-separated term and pages: "Reliabilität 115, 438"
+          - Sub-entries starting with – or 4: "– koeffizienten 438"
+            merged with their parent: → "Reliabilitätskoeffizienten"
+          - Page ranges: "45–72"
+          - Follower notation: "45f." / "45ff."
+          - Comma-separated pages: "45, 67, 89"
 
         :param text: Raw text of one or more index pages
         :return: Dict mapping terms to lists of page numbers/ranges
         """
         entries: dict[str, list[int | tuple[int, int]]] = {}
+        current_parent: str | None = None
 
-        for match in INDEX_ENTRY_PATTERN.finditer(text):
-            term = match.group(1).strip()
-            pages_str = match.group(2)
+        for line in text.splitlines():
+            original = line
+            line = line.strip()
+            if not line:
+                continue
 
-            # Skip overly short terms or numeric-only terms
+            # Detect sub-entry: line starts with –, —, or the Springer bullet (4)
+            sub_match = _SUBENTRY_RE.match(original)
+            is_sub = sub_match is not None
+            if is_sub:
+                # Strip the sub-entry prefix chars, keep any trailing connector
+                line = _SUBENTRY_RE.sub("", original).strip()
+
+            # Match term + page numbers
+            m = INDEX_ENTRY_PATTERN.match(line)
+            if not m:
+                continue
+
+            term = m.group(1).strip().rstrip(",")
+            pages_str = m.group(2)
+
+            # Skip overly short or numeric-only terms
             if len(term) < 2 or term.isdigit():
                 continue
 
+            # Build full term: attach sub-entry to parent
+            if is_sub and current_parent:
+                # Strip leading dashes/hyphens from sub-entry (compound or descriptive)
+                # Always join with space for consistent, searchable terms:
+                # "Reliabilität -koeffizient" → "Reliabilität koeffizient"
+                # "Reliabilität qualitativer Datensätze" → as-is
+                sub_clean = term.lstrip("- ").strip()
+                full_term = f"{current_parent} {sub_clean}"
+            else:
+                full_term = term
+                current_parent = term  # update parent for following sub-entries
+
+            # Parse page references
             page_refs: list[int | tuple[int, int]] = []
             for part in re.split(r"[,;]\s*", pages_str):
-                part = part.strip()
+                # Strip f./ff. follower notation
+                part = re.sub(r"f{1,2}\.?$", "", part.strip())
                 range_match = re.match(r"(\d+)\s*[-–—]\s*(\d+)", part)
                 if range_match:
                     page_refs.append(
@@ -301,7 +355,9 @@ class PDFPageExtractor:
                     page_refs.append(int(part))
 
             if page_refs:
-                entries[term] = page_refs
+                existing = entries.get(full_term, [])
+                existing.extend(page_refs)
+                entries[full_term] = existing
 
         return entries
 

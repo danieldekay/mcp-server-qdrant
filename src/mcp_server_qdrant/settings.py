@@ -168,6 +168,14 @@ class QdrantSettings(BaseSettings):
     local_path: str | None = Field(default=None, validation_alias="QDRANT_LOCAL_PATH")
     search_limit: int = Field(default=10, validation_alias="QDRANT_SEARCH_LIMIT")
     read_only: bool = Field(default=False, validation_alias="QDRANT_READ_ONLY")
+    allowed_collections: list[str] | None = Field(
+        default=None,
+        validation_alias="QDRANT_ALLOWED_COLLECTIONS",
+    )
+    allow_destructive_operations: bool = Field(
+        default=False,
+        validation_alias="QDRANT_ALLOW_DESTRUCTIVE_OPERATIONS",
+    )
 
     filterable_fields: list[FilterableField] | None = Field(
         default_factory=lambda: DEFAULT_FILTERABLE_FIELDS
@@ -180,6 +188,17 @@ class QdrantSettings(BaseSettings):
         if v is None:
             return DEFAULT_FILTERABLE_FIELDS
         return v
+
+    @field_validator("allowed_collections", mode="before")
+    @classmethod
+    def _parse_allowed_collections(cls, value):
+        """Support comma-separated allowlists from environment variables."""
+        if value in (None, "", []):
+            return None
+        if isinstance(value, str):
+            collections = [item.strip() for item in value.split(",") if item.strip()]
+            return collections or None
+        return value
 
     allow_arbitrary_filter: bool = Field(
         default=False, validation_alias="QDRANT_ALLOW_ARBITRARY_FILTER"

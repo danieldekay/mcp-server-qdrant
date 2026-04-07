@@ -144,6 +144,7 @@ async def ingest_file(
 
         # Prepare metadata
         file_metadata = {
+            PDFMetadataKeys.DOCUMENT_ID: file_path.name,
             PDFMetadataKeys.FILENAME: file_path.name,
             PDFMetadataKeys.FILEPATH: str(file_path),
             PDFMetadataKeys.EXTENSION: file_path.suffix,
@@ -153,10 +154,19 @@ async def ingest_file(
         # Create entry
         entry = Entry(content=content, metadata=file_metadata)
 
-        # Store in Qdrant
-        await connector.store(entry, collection_name=collection_name)
+        result = await connector.upsert_document_entries(
+            [entry],
+            collection_name=collection_name,
+            document_id=file_path.name,
+        )
 
-        logger.info(f"Ingested: {file_path}")
+        logger.info(
+            "Ingested %s (%s, stored=%s, updated=%s)",
+            file_path,
+            result["mode"],
+            result["stored"],
+            result["updated"],
+        )
         return True
 
     except Exception as e:
@@ -206,6 +216,7 @@ async def ingest_pdf_file(
                 page_to_terms = PDFPageExtractor.build_page_to_terms_map(index_entries)
                 logger.info(f"Parsed {len(index_entries)} index terms from {file_path.name}")
 
+        entries: list[Entry] = []
         for content, physical_index, page_label in pages_data:
             if not content.strip():
                 logger.debug(
@@ -250,13 +261,26 @@ async def ingest_pdf_file(
                 total_pages=total_pages,
             )
 
-            # Convert to standard Entry with metadata mapped correctly and store
-            await connector.store(entry.to_entry(), collection_name=collection_name)
+            entries.append(entry.to_entry())
 
             if (physical_index + 1) % 10 == 0 or (physical_index + 1) == total_pages:
                 logger.info(
                     f"Processing {file_path.name}: page {physical_index + 1}/{total_pages} (label: {page_label})"
                 )
+
+        result = await connector.upsert_document_entries(
+            entries,
+            collection_name=collection_name,
+            document_id=file_path.name,
+        )
+        logger.info(
+            "Finished PDF ingest %s (%s, stored=%s, updated=%s, deleted=%s)",
+            file_path.name,
+            result["mode"],
+            result["stored"],
+            result["updated"],
+            result["deleted"],
+        )
 
         return True
     except Exception as e:
