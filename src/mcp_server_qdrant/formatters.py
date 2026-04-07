@@ -49,14 +49,16 @@ class XMLEntryFormatter(EntryFormatter):
         :return: XML-formatted string
         """
         import json
+        from xml.sax.saxutils import escape
 
         metadata = entry.metadata or {}
         entry_metadata = json.dumps(metadata) if metadata else ""
         score_attr = f' score="{entry.score:.3f}"' if entry.score is not None else ""
+        escaped_content = escape(entry.content)
 
         if self._is_pdf_entry(metadata):
-            document_id = metadata.get(PDFMetadataKeys.DOCUMENT_ID)
-            page_label = metadata.get(PDFMetadataKeys.PAGE_LABEL)
+            document_id = escape(str(metadata.get(PDFMetadataKeys.DOCUMENT_ID, "")))
+            page_label = escape(str(metadata.get(PDFMetadataKeys.PAGE_LABEL, "")))
             physical_index = metadata.get(PDFMetadataKeys.PHYSICAL_PAGE_INDEX)
 
             physical_info = (
@@ -67,7 +69,7 @@ class XMLEntryFormatter(EntryFormatter):
 
             return (
                 f"<entry{score_attr}>"
-                f"<content>{entry.content}</content>"
+                f"<content>{escaped_content}</content>"
                 f"<page>Document: {document_id}, Page: {page_label}{physical_info}</page>"
                 f"<metadata>{entry_metadata}</metadata>"
                 f"</entry>"
@@ -75,7 +77,7 @@ class XMLEntryFormatter(EntryFormatter):
 
         return (
             f"<entry{score_attr}>"
-            f"<content>{entry.content}</content>"
+            f"<content>{escaped_content}</content>"
             f"<metadata>{entry_metadata}</metadata>"
             f"</entry>"
         )

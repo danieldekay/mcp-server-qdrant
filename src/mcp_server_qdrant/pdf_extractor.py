@@ -40,12 +40,19 @@ class PDFPageExtractor:
     def __init__(self, pdf_path: str, extraction_mode: str = "plain"):
         self.pdf_path = Path(pdf_path)
         self.extraction_mode = extraction_mode
+        self._reader: "PdfReader | None" = None
         if not PYPDF_AVAILABLE:
             raise ImportError(
                 "pypdf is not installed. Please install it with 'pip install pypdf>=5.1.0'."
             )
         if not self.pdf_path.exists():
             raise FileNotFoundError(f"PDF file not found: {self.pdf_path}")
+
+    def _get_reader(self) -> "PdfReader":
+        """Return a cached PdfReader instance (created on first access)."""
+        if self._reader is None:
+            self._reader = PdfReader(str(self.pdf_path))
+        return self._reader
 
     def _extract_text_from_page(self, page) -> str:
         """
@@ -75,7 +82,7 @@ class PDFPageExtractor:
         """Get the total number of pages in the PDF."""
 
         def _get_count():
-            reader = PdfReader(str(self.pdf_path))
+            reader = self._get_reader()
             return len(reader.pages)
 
         return await asyncio.to_thread(_get_count)
@@ -89,7 +96,7 @@ class PDFPageExtractor:
 
         def _extract():
             try:
-                reader = PdfReader(str(self.pdf_path))
+                reader = self._get_reader()
                 page = reader.pages[page_index]
                 return self._extract_text_from_page(page)
             except Exception as e:
@@ -110,7 +117,7 @@ class PDFPageExtractor:
 
         def _extract_label():
             try:
-                reader = PdfReader(str(self.pdf_path))
+                reader = self._get_reader()
                 label = reader.page_labels[page_index]
                 return self.format_page_label(str(label), page_index)
             except (IndexError, KeyError, Exception) as e:
@@ -128,7 +135,7 @@ class PDFPageExtractor:
         """
 
         def _extract_all():
-            reader = PdfReader(str(self.pdf_path))
+            reader = self._get_reader()
             pages_data = []
             for i in range(len(reader.pages)):
                 try:
@@ -180,7 +187,7 @@ class PDFPageExtractor:
         """
 
         def _extract():
-            reader = PdfReader(str(self.pdf_path))
+            reader = self._get_reader()
             outline = reader.outline
             if not outline:
                 return []
@@ -195,7 +202,7 @@ class PDFPageExtractor:
         """
 
         def _extract():
-            reader = PdfReader(str(self.pdf_path))
+            reader = self._get_reader()
             meta = reader.metadata
             if not meta:
                 return {}

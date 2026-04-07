@@ -9,6 +9,13 @@ from mcp_server_qdrant.settings import METADATA_PATH, FilterableField
 def make_filter(
     filterable_fields: dict[str, FilterableField], values: dict[str, Any]
 ) -> ArbitraryFilter:
+    """
+    Build a Qdrant filter from filterable field definitions and user-supplied values.
+    :param filterable_fields: Field name → FilterableField config
+    :param values: Field name → filter value supplied by the caller
+    :return: Serialized Qdrant Filter model
+    :raises ValueError: On unknown fields, missing required values, or invalid conditions
+    """
     must_conditions = []
     must_not_conditions = []
 
@@ -175,6 +182,12 @@ def make_filter(
 def make_indexes(
     filterable_fields: dict[str, FilterableField],
 ) -> dict[str, models.PayloadSchemaType]:
+    """
+    Map filterable field definitions to Qdrant payload index types.
+    :param filterable_fields: Field name → FilterableField config
+    :return: Dict of Qdrant payload paths → PayloadSchemaType
+    :raises ValueError: On unsupported field types
+    """
     indexes = {}
 
     for field_name, field in filterable_fields.items():

@@ -160,3 +160,85 @@ class TestEntryFormatters:
 
         assert "Content with empty metadata" in xml_result
         assert "Content with empty metadata" in json_result
+
+    def test_xml_formatter_escapes_special_characters(self):
+        """Test that XML formatter properly escapes <, >, & in content."""
+        entry = Entry(
+            content='Content with <html> tags & "quotes"',
+            metadata={"source": "test"},
+        )
+        formatter = XMLEntryFormatter()
+        result = formatter.format(entry)
+
+        assert "&lt;html&gt;" in result
+        assert "&amp;" in result
+        # Verify it's well-formed XML-ish structure
+        assert "<content>" in result
+        assert "</content>" in result
+
+    def test_xml_formatter_escapes_pdf_special_characters(self):
+        """Test XML escaping works for PDF entries too."""
+        entry = Entry(
+            content="Page with <formula> a & b",
+            metadata={
+                PDFMetadataKeys.DOCUMENT_ID: "doc<test>.pdf",
+                PDFMetadataKeys.PAGE_LABEL: "1",
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: 0,
+            },
+        )
+        formatter = XMLEntryFormatter()
+        result = formatter.format(entry)
+
+        assert "&lt;formula&gt;" in result
+        assert "a &amp; b" in result
+
+    def test_xml_formatter_with_score(self):
+        """Test XML formatter includes score attribute."""
+        entry = Entry(
+            content="Scored content",
+            metadata={"source": "test"},
+            score=0.987,
+        )
+        formatter = XMLEntryFormatter()
+        result = formatter.format(entry)
+
+        assert 'score="0.987"' in result
+
+    def test_json_formatter_with_score(self):
+        """Test JSON formatter includes score."""
+        import json
+
+        entry = Entry(
+            content="Scored content",
+            metadata={"source": "test"},
+            score=0.5,
+        )
+        formatter = JSONEntryFormatter()
+        result = formatter.format(entry)
+        parsed = json.loads(result)
+
+        assert parsed["score"] == 0.5
+
+    def test_plain_text_with_score(self):
+        """Test plain text formatter includes score."""
+        entry = Entry(
+            content="Scored content",
+            metadata={"source": "test"},
+            score=0.75,
+        )
+        formatter = PlainTextEntryFormatter()
+        result = formatter.format(entry)
+
+        assert "[score: 0.750]" in result
+
+    def test_markdown_with_score(self):
+        """Test Markdown formatter includes score."""
+        entry = Entry(
+            content="Scored content",
+            metadata={"source": "test"},
+            score=0.85,
+        )
+        formatter = MarkdownEntryFormatter()
+        result = formatter.format(entry)
+
+        assert "(score: 0.850)" in result

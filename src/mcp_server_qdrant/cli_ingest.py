@@ -101,13 +101,21 @@ def find_files(
 
         # Apply include pattern
         if include_pattern:
-            if not re.search(include_pattern, str(file_path)):
-                continue
+            try:
+                if not re.search(include_pattern, str(file_path)):
+                    continue
+            except re.error as e:
+                logger.error(f"Invalid include regex pattern '{include_pattern}': {e}")
+                return []
 
         # Apply exclude pattern
         if exclude_pattern:
-            if re.search(exclude_pattern, str(file_path)):
-                continue
+            try:
+                if re.search(exclude_pattern, str(file_path)):
+                    continue
+            except re.error as e:
+                logger.error(f"Invalid exclude regex pattern '{exclude_pattern}': {e}")
+                return []
 
         files.append(file_path)
 
