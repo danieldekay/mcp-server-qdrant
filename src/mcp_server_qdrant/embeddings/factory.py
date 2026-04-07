@@ -17,5 +17,13 @@ def create_embedding_provider(settings: EmbeddingProviderSettings) -> EmbeddingP
         from mcp_server_qdrant.embeddings.openai import OpenAIProvider
 
         return OpenAIProvider(settings.model_name)
+    elif settings.provider_type == EmbeddingProviderType.GEMINI:
+        from mcp_server_qdrant.embeddings.gemini import GeminiProvider
+
+        return GeminiProvider(settings.model_name)
+    elif settings.provider_type == EmbeddingProviderType.OPENROUTER:
+        from mcp_server_qdrant.embeddings.openrouter import OpenRouterProvider
+
+        return OpenRouterProvider(settings.model_name)
     else:
         raise ValueError(f"Unsupported embedding provider: {settings.provider_type}")
