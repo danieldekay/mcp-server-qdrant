@@ -8,7 +8,11 @@ representations (XML, JSON, plain text, etc.).
 from abc import ABC, abstractmethod
 from typing import Any
 
-from mcp_server_qdrant.constants import PDFMetadataKeys, TeachingMetadataKeys
+from mcp_server_qdrant.constants import (
+    DoclingMetadataKeys,
+    PDFMetadataKeys,
+    TeachingMetadataKeys,
+)
 from mcp_server_qdrant.qdrant import Entry
 
 
@@ -59,11 +63,35 @@ class EntryFormatter(ABC):
                 PDFMetadataKeys.PHYSICAL_PAGE_INDEX
             ]
 
+        if metadata.get(DoclingMetadataKeys.BOOK_PAGE_START) is not None:
+            reference["book_page_start"] = metadata[DoclingMetadataKeys.BOOK_PAGE_START]
+        if metadata.get(DoclingMetadataKeys.BOOK_PAGE_END) is not None:
+            reference["book_page_end"] = metadata[DoclingMetadataKeys.BOOK_PAGE_END]
+
         chapter_title = metadata.get(TeachingMetadataKeys.CHAPTER_TITLE) or metadata.get(
             PDFMetadataKeys.CHAPTER_TITLE
         )
         if chapter_title:
             reference["chapter_title"] = chapter_title
+
+        hierarchy = []
+        for key in (
+            DoclingMetadataKeys.HEADING_L1,
+            DoclingMetadataKeys.HEADING_L2,
+            DoclingMetadataKeys.HEADING_L3,
+        ):
+            value = metadata.get(key)
+            if value and value not in hierarchy:
+                hierarchy.append(value)
+        if hierarchy:
+            reference["hierarchy"] = hierarchy
+
+        citation = metadata.get("apa_zitation") or metadata.get(DoclingMetadataKeys.APA_CITATION)
+        if citation:
+            reference["apa_citation"] = citation
+
+        if metadata.get(DoclingMetadataKeys.CHUNK_TYPE):
+            reference["chunk_type"] = metadata[DoclingMetadataKeys.CHUNK_TYPE]
 
         if metadata.get(TeachingMetadataKeys.COURSE_ID):
             reference["course_id"] = metadata[TeachingMetadataKeys.COURSE_ID]
@@ -95,12 +123,23 @@ class EntryFormatter(ABC):
             if physical_index is not None:
                 page_info += f" (physical page {physical_index + 1})"
             parts.append(page_info)
+        if reference.get("book_page_start") is not None:
+            book_page_info = f"Book page: {reference['book_page_start']}"
+            if reference.get("book_page_end") not in (None, reference.get("book_page_start")):
+                book_page_info += f"-{reference['book_page_end']}"
+            parts.append(book_page_info)
         if reference.get("chapter_title"):
             parts.append(f"Chapter: {reference['chapter_title']}")
+        if reference.get("hierarchy"):
+            parts.append("Path: " + " > ".join(reference["hierarchy"]))
+        if reference.get("chunk_type"):
+            parts.append(f"Chunk type: {reference['chunk_type']}")
         if reference.get("content_type"):
             parts.append(f"Type: {reference['content_type']}")
         if reference.get("language"):
             parts.append(f"Language: {reference['language']}")
+        if reference.get("apa_citation"):
+            parts.append(f"Citation: {reference['apa_citation']}")
 
         return "; ".join(parts)
 

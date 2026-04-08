@@ -21,9 +21,11 @@ It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Genera
 - **Multiple Embedding Providers** - Support for FastEmbed, Model2Vec, OpenAI-compatible, Gemini, and OpenRouter
 - **Collection Statistics** - Track point counts and vector dimensions for all collections in `get-schema`
 - **Result Relevance Scores** - All search results include numeric relevance scores
+- **Deep Citation Metadata** - Search results can expose book-page ranges, chapter paths, and APA citations for lecturer-grade referencing
 - **Teaching Metadata Schema** - Built-in support for `course_id`, `chapter`, `textbook`, `content_type`, and `language` filtering
 - **Multi-Collection Search** - Query across multiple namespaces with `qdrant-find-all`
 - **Hybrid Search** - Combine dense and sparse vectors for improved retrieval accuracy
+- **Inventory & Verification Tools** - Inspect ingested books and validate chapter/page metadata quality before course use
 
 ## Components
 
@@ -38,26 +40,52 @@ It acts as a semantic memory layer with advanced RAG (Retrieval-Augmented Genera
    - Input:
      - `information` (string): Information to store
      - `metadata` (JSON): Optional metadata (e.g., `course_id`, `chapter`, `textbook`)
-     - `collection_name` (string): Name of the collection to store the information in.
+     - `collection_name` (string, optional): Name of the target collection. If `COLLECTION_NAME` is configured, it is used only as a fallback and can still be overridden explicitly.
    - Returns: Confirmation message
 3. `qdrant-find`
    - Retrieve relevant information from the Qdrant database
    - Input:
      - `query` (string): Query to use for searching
-     - `collection_name` (string): Name of the collection to search in
+     - `collection_name` (string, optional): Name of the collection to search in. If omitted, the configured `COLLECTION_NAME` is used as fallback.
    - Returns: Scored search results formatted as separate messages
 4. `qdrant-find-all`
    - Search across all collections simultaneously
    - Input:
      - `query` (string): Query to use for searching
+     - `collection_names` (string[], optional): Explicit list of collections to search. If omitted, all accessible collections are searched.
      - `limit` (number): Max results per collection
    - Returns: Merged and scored search results from multiple collections
 5. `qdrant-ingest-pdf`
    - Recursive PDF ingestion tool
    - Input:
      - `path` (string): File or directory path to ingest
-     - `collection_name` (string): Target collection
+     - `collection_name` (string, optional): Target collection. If omitted, the configured `COLLECTION_NAME` is used as fallback.
    - Returns: Ingestion summary (pages processed)
+6. `qdrant-list-documents`
+     - List ingested documents in a collection
+     - Input:
+       - `collection_name` (string, optional): Collection to inspect when no default collection is configured
+     - Returns: Document summaries with chunk counts and citations
+7. `qdrant-list-chapters`
+     - List chapter or section entries discovered for one collection or document
+     - Input:
+       - `collection_name` (string, optional): Collection to inspect when no default collection is configured
+       - `document_id` (string, optional): Restrict to one document
+     - Returns: Table of contents with page numbers
+8. `qdrant-get-inventory`
+     - Return a structured inventory for one collection or document
+     - Input:
+       - `collection_name` (string, optional): Collection to inspect when no default collection is configured
+       - `document_id` (string, optional): Restrict to one document
+     - Returns: JSON with documents, chapters, page ranges, chunk types, figure counts, and citations
+9. `qdrant-verify-ingestion`
+     - Validate whether ingested books expose the metadata needed for citation-rich retrieval
+     - Input:
+       - `collection_name` (string, optional): Collection to inspect when no default collection is configured
+       - `document_id` (string, optional): Restrict to one document
+     - Returns: JSON health report with warnings for missing book pages, chapter metadata, or legacy TOC fallback
+
+All collection-bound tools treat `COLLECTION_NAME` as a default only. They continue to accept explicit `collection_name` overrides so one MCP server instance can work across multiple book collections.
 
 ## Environment Variables
 

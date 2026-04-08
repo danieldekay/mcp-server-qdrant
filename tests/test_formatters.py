@@ -6,7 +6,7 @@ Validates different formatting strategies and their outputs.
 
 import pytest
 
-from mcp_server_qdrant.constants import PDFMetadataKeys
+from mcp_server_qdrant.constants import DoclingMetadataKeys, PDFMetadataKeys
 from mcp_server_qdrant.formatters import (
     JSONEntryFormatter,
     MarkdownEntryFormatter,
@@ -88,6 +88,40 @@ class TestEntryFormatters:
         assert parsed["page_info"]["document_id"] == "test_document.pdf"
         assert parsed["page_info"]["page_label"] == "iv"
         assert parsed["page_info"]["physical_page_index"] == 3
+
+    def test_reference_block_includes_book_pages_hierarchy_and_citation(self):
+        entry = Entry(
+            content="Docling content",
+            metadata={
+                "_collection": "methods",
+                PDFMetadataKeys.DOCUMENT_ID: "chapter.pdf",
+                PDFMetadataKeys.PAGE_LABEL: "699",
+                PDFMetadataKeys.PHYSICAL_PAGE_INDEX: 8,
+                DoclingMetadataKeys.BOOK_PAGE_START: 699,
+                DoclingMetadataKeys.BOOK_PAGE_END: 700,
+                DoclingMetadataKeys.HEADING_L1: "43 Qualitative Inhaltsanalyse",
+                DoclingMetadataKeys.HEADING_L2: "43.6 Eine Beispielstudie",
+                DoclingMetadataKeys.APA_CITATION: "Mayring, P., & Fenzl, T. (2022). Qualitative Inhaltsanalyse.",
+                DoclingMetadataKeys.CHUNK_TYPE: "text",
+            },
+        )
+
+        text_result = PlainTextEntryFormatter().format(entry)
+        assert "Book page: 699-700" in text_result
+        assert "Path: 43 Qualitative Inhaltsanalyse > 43.6 Eine Beispielstudie" in text_result
+        assert "Citation: Mayring, P., & Fenzl, T. (2022). Qualitative Inhaltsanalyse." in text_result
+
+        json_result = JSONEntryFormatter().format(entry)
+        import json
+
+        parsed = json.loads(json_result)
+        assert parsed["reference"]["book_page_start"] == 699
+        assert parsed["reference"]["book_page_end"] == 700
+        assert parsed["reference"]["hierarchy"] == [
+            "43 Qualitative Inhaltsanalyse",
+            "43.6 Eine Beispielstudie",
+        ]
+        assert parsed["reference"]["apa_citation"].startswith("Mayring, P.")
 
     def test_plain_text_formatter_basic_entry(self, basic_entry):
         """Test plain text formatter with basic entry."""

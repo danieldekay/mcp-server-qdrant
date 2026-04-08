@@ -180,6 +180,15 @@ class QdrantMCPServer(FastMCP):
                 "QDRANT_ALLOW_DESTRUCTIVE_OPERATIONS=true to enable collection deletion."
             )
 
+    def _resolve_collection_name(self, collection_name: str | None) -> str:
+        """Resolve an optional collection name against the configured default."""
+        resolved = collection_name or self.qdrant_settings.collection_name
+        if not resolved:
+            raise ValueError(
+                "No collection specified. Provide collection_name or configure COLLECTION_NAME."
+            )
+        return resolved
+
     def _resolve_query_mode(
         self,
         query_mode: str,
@@ -234,6 +243,14 @@ class QdrantMCPServer(FastMCP):
                 "tool": "qdrant-list-chapters",
                 "arguments": {"collection_name": collection_name},
             },
+            "inventory": {
+                "tool": "qdrant-get-inventory",
+                "arguments": {"collection_name": collection_name},
+            },
+            "verify_ingestion": {
+                "tool": "qdrant-verify-ingestion",
+                "arguments": {"collection_name": collection_name},
+            },
         }
 
         filter_names = {field["name"] for field in self._extract_filterable_fields()}
@@ -269,8 +286,14 @@ class QdrantMCPServer(FastMCP):
             ctx: Context,
             information: Annotated[str, Field(description="Text to store")],
             collection_name: Annotated[
-                str, Field(description="The collection to store the information in")
-            ],
+                str | None,
+                Field(
+                    description=(
+                        "The collection to store the information in "
+                        "(optional when COLLECTION_NAME is configured)"
+                    )
+                ),
+            ] = None,
             # The `metadata` parameter is defined as non-optional, but it can be None.
             # If we set it to be optional, some of the MCP clients, like Cursor, cannot
             # handle the optional parameter correctly.
@@ -292,21 +315,26 @@ class QdrantMCPServer(FastMCP):
             """
             await ctx.debug(f"Storing information {information} in Qdrant")
 
+            collection_name = self._resolve_collection_name(collection_name)
             self._enforce_collection_access(collection_name)
 
             entry = Entry(content=information, metadata=metadata)
 
             await self.qdrant_connector.store(entry, collection_name=collection_name)
-            if collection_name:
-                return f"Remembered: {information} in collection {collection_name}"
-            return f"Remembered: {information}"
+            return f"Remembered: {information} in collection {collection_name}"
 
         async def find(
             ctx: Context,
             query: Annotated[str, Field(description="What to search for")],
             collection_name: Annotated[
-                str, Field(description="The collection to search in")
-            ],
+                str | None,
+                Field(
+                    description=(
+                        "The collection to search in "
+                        "(optional when COLLECTION_NAME is configured)"
+                    )
+                ),
+            ] = None,
             query_mode: Annotated[
                 Literal["balanced", "precision", "recall"],
                 Field(
@@ -356,6 +384,7 @@ class QdrantMCPServer(FastMCP):
             # Log query_filter
             await ctx.debug(f"Query filter: {query_filter}")
 
+            collection_name = self._resolve_collection_name(collection_name)
             self._enforce_collection_access(collection_name)
 
             query_filter = models.Filter(**query_filter) if query_filter else None
@@ -409,14 +438,6 @@ class QdrantMCPServer(FastMCP):
             find_foo = wrap_filters(find_foo, filterable_conditions)
         elif not self.qdrant_settings.allow_arbitrary_filter:
             find_foo = make_partial_function(find_foo, {"query_filter": None})
-
-        if self.qdrant_settings.collection_name:
-            find_foo = make_partial_function(
-                find_foo, {"collection_name": self.qdrant_settings.collection_name}
-            )
-            store_foo = make_partial_function(
-                store_foo, {"collection_name": self.qdrant_settings.collection_name}
-            )
 
         self.tool(
             find_foo,
@@ -485,8 +506,14 @@ class QdrantMCPServer(FastMCP):
                     str, Field(description="Absolute path to the PDF file")
                 ],
                 collection_name: Annotated[
-                    str, Field(description="Target collection name")
-                ],
+                    str | None,
+                    Field(
+                        description=(
+                            "Target collection name "
+                            "(optional when COLLECTION_NAME is configured)"
+                        )
+                    ),
+                ] = None,
                 document_id: Annotated[
                     str | None,
                     Field(
@@ -539,6 +566,7 @@ class QdrantMCPServer(FastMCP):
 
                 doc_id = document_id or pdf_path.stem
 
+                collection_name = self._resolve_collection_name(collection_name)
                 self._enforce_collection_access(collection_name)
 
                 await ctx.debug(
@@ -579,15 +607,8 @@ class QdrantMCPServer(FastMCP):
                     f"updated={result['updated']}, deleted={result['deleted']})"
                 )
 
-            ingest_pdf_foo = ingest_pdf
-            if self.qdrant_settings.collection_name:
-                ingest_pdf_foo = make_partial_function(
-                    ingest_pdf_foo,
-                    {"collection_name": self.qdrant_settings.collection_name},
-                )
-
             self.tool(
-                ingest_pdf_foo,
+                ingest_pdf,
                 name="qdrant-ingest-pdf",
                 description=(
                     "Ingest a PDF file page-by-page into the knowledge base. "
@@ -599,9 +620,9 @@ class QdrantMCPServer(FastMCP):
         async def list_documents(
             ctx: Context,
             collection_name: Annotated[
-                str,
-                Field(description="The collection to inspect"),
-            ],
+                str | None,
+                Field(description="The collection to inspect (optional when COLLECTION_NAME is configured)"),
+            ] = None,
         ) -> str:
             """
             List all ingested documents in a collection with page counts and metadata.
@@ -609,6 +630,7 @@ class QdrantMCPServer(FastMCP):
             :param collection_name: The collection to inspect.
             :return: Formatted summary of all documents.
             """
+            collection_name = self._resolve_collection_name(collection_name)
             self._enforce_collection_access(collection_name)
             await ctx.debug(f"Listing documents in collection '{collection_name}'")
             docs = await self.qdrant_connector.list_documents(
@@ -639,15 +661,8 @@ class QdrantMCPServer(FastMCP):
 
             return "\n".join(lines)
 
-        list_documents_foo = list_documents
-        if self.qdrant_settings.collection_name:
-            list_documents_foo = make_partial_function(
-                list_documents_foo,
-                {"collection_name": self.qdrant_settings.collection_name},
-            )
-
         self.tool(
-            list_documents_foo,
+            list_documents,
             name="qdrant-list-documents",
             description=(
                 "List all ingested documents in the collection with page counts and metadata. "
@@ -668,8 +683,9 @@ class QdrantMCPServer(FastMCP):
                 ),
             ],
             collection_name: Annotated[
-                str, Field(description="The collection to search in")
-            ],
+                str | None,
+                Field(description="The collection to search in (optional when COLLECTION_NAME is configured)"),
+            ] = None,
             document_id: Annotated[
                 str | None,
                 Field(description="Restrict search to a specific document (optional)"),
@@ -691,6 +707,7 @@ class QdrantMCPServer(FastMCP):
             :param limit: Maximum number of results.
             :return: List of matching entries or None.
             """
+            collection_name = self._resolve_collection_name(collection_name)
             self._enforce_collection_access(collection_name)
             await ctx.debug(f"Keyword search: '{keyword}' in '{collection_name}'")
             entries = await self.qdrant_connector.keyword_search(
@@ -706,15 +723,8 @@ class QdrantMCPServer(FastMCP):
                 content.append(self.format_entry(entry))
             return content
 
-        keyword_search_foo = keyword_search
-        if self.qdrant_settings.collection_name:
-            keyword_search_foo = make_partial_function(
-                keyword_search_foo,
-                {"collection_name": self.qdrant_settings.collection_name},
-            )
-
         self.tool(
-            keyword_search_foo,
+            keyword_search,
             name="qdrant-keyword-search",
             description=(
                 "Full-text keyword search in the knowledge base. "
@@ -727,8 +737,9 @@ class QdrantMCPServer(FastMCP):
         async def list_chapters(
             ctx: Context,
             collection_name: Annotated[
-                str, Field(description="The collection to inspect")
-            ],
+                str | None,
+                Field(description="The collection to inspect (optional when COLLECTION_NAME is configured)"),
+            ] = None,
             document_id: Annotated[
                 str | None,
                 Field(description="Restrict to a specific document (optional)"),
@@ -742,6 +753,7 @@ class QdrantMCPServer(FastMCP):
             :param document_id: Optionally restrict to a specific document.
             :return: Formatted table of contents.
             """
+            collection_name = self._resolve_collection_name(collection_name)
             self._enforce_collection_access(collection_name)
             await ctx.debug(f"Listing chapters in '{collection_name}'")
             chapters = await self.qdrant_connector.list_chapters(
@@ -764,20 +776,73 @@ class QdrantMCPServer(FastMCP):
 
             return "\n".join(lines)
 
-        list_chapters_foo = list_chapters
-        if self.qdrant_settings.collection_name:
-            list_chapters_foo = make_partial_function(
-                list_chapters_foo,
-                {"collection_name": self.qdrant_settings.collection_name},
-            )
-
         self.tool(
-            list_chapters_foo,
+            list_chapters,
             name="qdrant-list-chapters",
             description=(
                 "List all chapters and sections from the ingested documents "
                 "(extracted from PDF bookmarks). Shows the table of contents "
                 "with page numbers. Use before searching to understand document structure."
+            ),
+        )
+
+        async def get_inventory(
+            ctx: Context,
+            collection_name: Annotated[
+                str | None,
+                Field(description="The collection to inspect (optional when COLLECTION_NAME is configured)"),
+            ] = None,
+            document_id: Annotated[
+                str | None,
+                Field(description="Restrict inventory to a specific document (optional)"),
+            ] = None,
+        ) -> str:
+            """Return a structured inventory of documents, chapters, and citation metadata."""
+            collection_name = self._resolve_collection_name(collection_name)
+            self._enforce_collection_access(collection_name)
+            await ctx.debug(f"Building inventory for '{collection_name}'")
+            inventory = await self.qdrant_connector.get_inventory(
+                collection_name=collection_name,
+                document_id=document_id,
+            )
+            return json.dumps(inventory, ensure_ascii=False, indent=2)
+
+        self.tool(
+            get_inventory,
+            name="qdrant-get-inventory",
+            description=(
+                "Return a structured inventory of documents, chapters, page ranges, and citation metadata. "
+                "Use this for textbook validation, syllabus mapping, and retrieval planning."
+            ),
+        )
+
+        async def verify_ingestion(
+            ctx: Context,
+            collection_name: Annotated[
+                str | None,
+                Field(description="The collection to verify (optional when COLLECTION_NAME is configured)"),
+            ] = None,
+            document_id: Annotated[
+                str | None,
+                Field(description="Restrict verification to a specific document (optional)"),
+            ] = None,
+        ) -> str:
+            """Check whether an ingested document exposes the metadata needed for citation-rich retrieval."""
+            collection_name = self._resolve_collection_name(collection_name)
+            self._enforce_collection_access(collection_name)
+            await ctx.debug(f"Verifying ingestion quality for '{collection_name}'")
+            verification = await self.qdrant_connector.verify_ingestion(
+                collection_name=collection_name,
+                document_id=document_id,
+            )
+            return json.dumps(verification, ensure_ascii=False, indent=2)
+
+        self.tool(
+            verify_ingestion,
+            name="qdrant-verify-ingestion",
+            description=(
+                "Validate ingestion quality for one collection or document, including chapter coverage, "
+                "book-page metadata, section-header availability, and warnings for legacy fallback cases."
             ),
         )
 
@@ -787,6 +852,15 @@ class QdrantMCPServer(FastMCP):
                 str,
                 Field(description="Search query across all collections"),
             ],
+            collection_names: Annotated[
+                list[str] | None,
+                Field(
+                    description=(
+                        "Optional list of collection names to search. "
+                        "If omitted, all accessible collections are searched."
+                    )
+                ),
+            ] = None,
             query_mode: Annotated[
                 Literal["balanced", "precision", "recall"],
                 Field(description="Retrieval preset used for each collection"),
@@ -809,12 +883,18 @@ class QdrantMCPServer(FastMCP):
             Search across all collections in the Qdrant server.
             :param ctx: The context for the request.
             :param query: The search query.
+            :param collection_names: Optional collection subset to search.
             :param limit: Max results per collection.
             :return: Combined results from all collections.
             """
-            collections = self._filter_allowed_collections(
-                await self.qdrant_connector.get_collection_names()
-            )
+            if collection_names:
+                for collection_name in collection_names:
+                    self._enforce_collection_access(collection_name)
+                collections = collection_names
+            else:
+                collections = self._filter_allowed_collections(
+                    await self.qdrant_connector.get_collection_names()
+                )
             if not collections:
                 return None
 
@@ -873,7 +953,8 @@ class QdrantMCPServer(FastMCP):
             description=(
                 "Search across ALL collections in the knowledge base. "
                 "Use when you need to find content across multiple courses "
-                "or document sets. Results are globally ranked by score."
+                "or document sets. Optionally restrict the search to an explicit "
+                "list of collections. Results are globally ranked by score."
             ),
         )
 
@@ -950,16 +1031,22 @@ class QdrantMCPServer(FastMCP):
 
             async def delete_document(
                 ctx: Context,
-                collection_name: Annotated[
-                    str,
-                    Field(description="Collection containing the document"),
-                ],
                 document_id: Annotated[
                     str,
                     Field(description="Document identifier to delete"),
                 ],
+                collection_name: Annotated[
+                    str | None,
+                    Field(
+                        description=(
+                            "Collection containing the document "
+                            "(optional when COLLECTION_NAME is configured)"
+                        )
+                    ),
+                ] = None,
             ) -> str:
                 """Delete all points associated with a document identifier."""
+                collection_name = self._resolve_collection_name(collection_name)
                 self._enforce_collection_access(collection_name, destructive=True)
                 await ctx.debug(
                     f"Deleting document '{document_id}' from '{collection_name}'"
@@ -976,12 +1063,18 @@ class QdrantMCPServer(FastMCP):
             async def delete_by_filter(
                 ctx: Context,
                 collection_name: Annotated[
-                    str,
-                    Field(description="Collection to delete from"),
-                ],
+                    str | None,
+                    Field(
+                        description=(
+                            "Collection to delete from "
+                            "(optional when COLLECTION_NAME is configured)"
+                        )
+                    ),
+                ] = None,
                 query_filter: ArbitraryFilter | None = None,
             ) -> str:
                 """Delete points selected by metadata filters."""
+                collection_name = self._resolve_collection_name(collection_name)
                 self._enforce_collection_access(collection_name, destructive=True)
                 if not query_filter:
                     raise ValueError(
@@ -1031,14 +1124,19 @@ class QdrantMCPServer(FastMCP):
                     str,
                     Field(description="Full document text to create or replace"),
                 ],
-                collection_name: Annotated[
-                    str,
-                    Field(description="Collection containing the document"),
-                ],
                 document_id: Annotated[
                     str,
                     Field(description="Stable document identifier"),
                 ],
+                collection_name: Annotated[
+                    str | None,
+                    Field(
+                        description=(
+                            "Collection containing the document "
+                            "(optional when COLLECTION_NAME is configured)"
+                        )
+                    ),
+                ] = None,
                 metadata: Annotated[
                     Metadata | None,
                     Field(
@@ -1050,6 +1148,7 @@ class QdrantMCPServer(FastMCP):
                 ] = None,
             ) -> str:
                 """Create or replace a document as an idempotent upsert operation."""
+                collection_name = self._resolve_collection_name(collection_name)
                 self._enforce_collection_access(collection_name)
                 await ctx.debug(
                     f"Replacing or creating document '{document_id}' in '{collection_name}'"
@@ -1067,10 +1166,6 @@ class QdrantMCPServer(FastMCP):
 
             async def update_document_metadata(
                 ctx: Context,
-                collection_name: Annotated[
-                    str,
-                    Field(description="Collection containing the document"),
-                ],
                 document_id: Annotated[
                     str,
                     Field(description="Document identifier to update"),
@@ -1079,8 +1174,18 @@ class QdrantMCPServer(FastMCP):
                     Metadata,
                     Field(description="Metadata keys and values to merge into the document"),
                 ],
+                collection_name: Annotated[
+                    str | None,
+                    Field(
+                        description=(
+                            "Collection containing the document "
+                            "(optional when COLLECTION_NAME is configured)"
+                        )
+                    ),
+                ] = None,
             ) -> str:
                 """Update metadata for all chunks/pages of a document without re-embedding."""
+                collection_name = self._resolve_collection_name(collection_name)
                 self._enforce_collection_access(collection_name)
                 await ctx.debug(
                     f"Updating metadata for document '{document_id}' in '{collection_name}'"

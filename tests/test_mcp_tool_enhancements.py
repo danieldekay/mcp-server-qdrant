@@ -109,6 +109,30 @@ async def test_find_all_ranks_results_globally():
 
 
 @pytest.mark.asyncio
+async def test_find_all_can_target_specific_collections():
+    server = make_server()
+    await server.qdrant_connector.store(
+        Entry(content="alpha result in first", metadata={"document_id": "doc-a"}),
+        collection_name="collection-a",
+    )
+    await server.qdrant_connector.store(
+        Entry(content="alpha result in second", metadata={"document_id": "doc-b"}),
+        collection_name="collection-b",
+    )
+
+    tool = await get_tool(server, "qdrant-find-all")
+    result = await tool.fn(
+        DummyCtx(),
+        query="alpha",
+        collection_names=["collection-b"],
+        limit=3,
+    )
+
+    assert any("alpha result in second" in part for part in result)
+    assert not any("alpha result in first" in part for part in result)
+
+
+@pytest.mark.asyncio
 async def test_get_schema_exposes_examples_and_policies():
     server = make_server(
         allowed_collections=["course-a", "course-b"],
@@ -137,6 +161,56 @@ async def test_find_tool_schema_includes_query_mode():
         props = tool.inputSchema.get("properties", {})
 
     assert "query_mode" in props
+
+
+@pytest.mark.asyncio
+async def test_find_tool_uses_default_but_allows_override():
+    server = make_server(collection_name="default-course")
+
+    await server.qdrant_connector.store(
+        Entry(content="Alpha in default", metadata={"document_id": "default.md"}),
+        collection_name="default-course",
+    )
+    await server.qdrant_connector.store(
+        Entry(content="Alpha in other", metadata={"document_id": "other.md"}),
+        collection_name="other-course",
+    )
+
+    tool = await get_tool(server, "qdrant-find")
+    default_result = await tool.fn(DummyCtx(), query="Alpha")
+    override_result = await tool.fn(
+        DummyCtx(),
+        query="Alpha",
+        collection_name="other-course",
+    )
+
+    assert any("Alpha in default" in part for part in default_result)
+    assert any("Alpha in other" in part for part in override_result)
+
+
+@pytest.mark.asyncio
+async def test_keyword_search_tool_uses_default_but_allows_override():
+    server = make_server(collection_name="default-course")
+
+    await server.qdrant_connector.store(
+        Entry(content="Keyword appears in default", metadata={"document_id": "default.md"}),
+        collection_name="default-course",
+    )
+    await server.qdrant_connector.store(
+        Entry(content="Keyword appears in other", metadata={"document_id": "other.md"}),
+        collection_name="other-course",
+    )
+
+    tool = await get_tool(server, "qdrant-keyword-search")
+    default_result = await tool.fn(DummyCtx(), keyword="Keyword")
+    override_result = await tool.fn(
+        DummyCtx(),
+        keyword="Keyword",
+        collection_name="other-course",
+    )
+
+    assert any("Keyword appears in default" in part for part in default_result)
+    assert any("Keyword appears in other" in part for part in override_result)
 
 
 @pytest.mark.asyncio
@@ -245,3 +319,150 @@ async def test_new_tool_schema_includes_document_lifecycle_tools():
 
     assert "qdrant-replace-document" in tools
     assert "qdrant-update-document-metadata" in tools
+
+
+@pytest.mark.asyncio
+async def test_list_documents_tool_uses_default_but_allows_override():
+    server = make_server(collection_name="default-course")
+
+    await server.qdrant_connector.store(
+        Entry(
+            content="Default collection entry",
+            metadata={"document_id": "default.pdf", "page_label": "1"},
+        ),
+        collection_name="default-course",
+    )
+    await server.qdrant_connector.store(
+        Entry(
+            content="Other collection entry",
+            metadata={"document_id": "other.pdf", "page_label": "1"},
+        ),
+        collection_name="other-course",
+    )
+
+    tool = await get_tool(server, "qdrant-list-documents")
+    default_result = await tool.fn(DummyCtx())
+    override_result = await tool.fn(DummyCtx(), collection_name="other-course")
+
+    assert "default.pdf" in default_result
+    assert "other.pdf" in override_result
+
+
+@pytest.mark.asyncio
+async def test_store_tool_uses_default_but_allows_override():
+    server = make_server(collection_name="default-course")
+
+    tool = await get_tool(server, "qdrant-store")
+
+    default_result = await tool.fn(
+        DummyCtx(),
+        information="Default memory",
+        metadata={"document_id": "default.md"},
+    )
+    override_result = await tool.fn(
+        DummyCtx(),
+        information="Other memory",
+        collection_name="other-course",
+        metadata={"document_id": "other.md"},
+    )
+
+    default_entries = await server.qdrant_connector.search(
+        "Default memory",
+        collection_name="default-course",
+    )
+    override_entries = await server.qdrant_connector.search(
+        "Other memory",
+        collection_name="other-course",
+    )
+
+    assert "default-course" in default_result
+    assert "other-course" in override_result
+    assert len(default_entries) == 1
+    assert len(override_entries) == 1
+
+
+@pytest.mark.asyncio
+async def test_document_lifecycle_tools_use_default_but_allow_override():
+    server = make_server(collection_name="default-course")
+
+    replace_tool = await get_tool(server, "qdrant-replace-document")
+    update_tool = await get_tool(server, "qdrant-update-document-metadata")
+
+    default_result = await replace_tool.fn(
+        DummyCtx(),
+        information="Default syllabus",
+        document_id="default.md",
+        metadata={"course_id": "default"},
+    )
+    override_result = await replace_tool.fn(
+        DummyCtx(),
+        information="Other syllabus",
+        collection_name="other-course",
+        document_id="other.md",
+        metadata={"course_id": "other"},
+    )
+
+    update_result = await update_tool.fn(
+        DummyCtx(),
+        collection_name="other-course",
+        document_id="other.md",
+        metadata={"language": "de"},
+    )
+
+    default_entries = await server.qdrant_connector.search(
+        "Default syllabus",
+        collection_name="default-course",
+    )
+    override_entries = await server.qdrant_connector.search(
+        "Other syllabus",
+        collection_name="other-course",
+    )
+
+    assert "default-course" in default_result
+    assert "other-course" in override_result
+    assert "other.md" in update_result
+    assert len(default_entries) == 1
+    assert len(override_entries) == 1
+    assert override_entries[0].metadata["language"] == "de"
+
+
+@pytest.mark.asyncio
+async def test_inventory_and_verify_tools_expose_ingestion_health():
+    server = make_server(collection_name="methods")
+
+    await server.qdrant_connector.store(
+        Entry(
+            content="Qualitative Inhaltsanalyse ist regelgeleitet.",
+            metadata={
+                "document_id": "mayring.pdf",
+                "filename": "Mayring.pdf",
+                "page_label": "691",
+                "physical_page_index": 0,
+                "book_page_start": 691,
+                "book_page_end": 691,
+                "chapter_title": "43.1 Was ist qualitative Inhaltsanalyse?",
+                "apa_zitation": "Mayring, P., & Fenzl, T. (2022). Qualitative Inhaltsanalyse.",
+                "chunk_type": "text",
+                "total_pages": 16,
+            },
+        ),
+        collection_name="methods",
+    )
+
+    inventory_tool = await get_tool(server, "qdrant-get-inventory")
+    verify_tool = await get_tool(server, "qdrant-verify-ingestion")
+
+    inventory = json.loads(await inventory_tool.fn(DummyCtx()))
+    verification = json.loads(await verify_tool.fn(DummyCtx()))
+
+    assert inventory["document_count"] == 1
+    assert inventory["documents"][0]["document_id"] == "mayring.pdf"
+    assert inventory["documents"][0]["book_page_start"] == 691
+    assert inventory["documents"][0]["chapter_count"] == 1
+
+    assert verification["status"] == "warning"
+    assert verification["documents"][0]["document_id"] == "mayring.pdf"
+    assert any(
+        "legacy fallback heuristics" in warning
+        for warning in verification["documents"][0]["warnings"]
+    )

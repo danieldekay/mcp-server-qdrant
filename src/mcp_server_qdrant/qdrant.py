@@ -7,7 +7,11 @@ from typing import Any
 from pydantic import BaseModel
 from qdrant_client import AsyncQdrantClient, models
 
-from mcp_server_qdrant.constants import PDFMetadataKeys, SystemMetadataKeys
+from mcp_server_qdrant.constants import (
+    DoclingMetadataKeys,
+    PDFMetadataKeys,
+    SystemMetadataKeys,
+)
 from mcp_server_qdrant.embeddings.base import EmbeddingProvider
 from mcp_server_qdrant.settings import METADATA_PATH
 
@@ -71,6 +75,26 @@ class PDFPageEntry(Entry):
             }
         )
         return Entry(content=self.content, metadata=metadata)
+
+
+class DoclingChunkEntry(Entry):
+    """
+    A semantic chunk entry produced by the Docling pipeline.
+
+    Contains rich academic metadata including printed book page numbers,
+    heading hierarchy, chunk type classification, and figure asset paths.
+    Stored directly as an Entry – all Docling metadata is flat in the
+    metadata dict (populated by ProcessedChunk.to_dict()).
+    """
+
+    chunk_index: int = 0
+    chunk_type: str = "text"
+    book_pages: list[int] = []
+    pdf_pages: list[int] = []
+
+    def to_entry(self) -> Entry:
+        """Return self as a plain Entry (metadata already fully populated)."""
+        return Entry(content=self.content, metadata=self.metadata or {})
 
 
 class QdrantConnector:
@@ -667,6 +691,166 @@ class QdrantConnector:
 
         return list(documents.values())
 
+    async def get_inventory(
+        self,
+        collection_name: str | None = None,
+        document_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return a lecturer-friendly inventory with document and chapter metadata."""
+        collection_name = collection_name or self._default_collection_name
+        inventory: dict[str, Any] = {
+            "collection_name": collection_name,
+            "document_count": 0,
+            "documents": [],
+        }
+        if not collection_name:
+            return inventory
+        if not await self._client.collection_exists(collection_name):
+            return inventory
+
+        points = (
+            await self.get_document_points(document_id, collection_name=collection_name)
+            if document_id
+            else await self._scroll_all_points(collection_name)
+        )
+        if not points:
+            return inventory
+
+        documents: dict[str, dict[str, Any]] = {}
+        for point in points:
+            _content, meta = self._extract_content_and_metadata(point.payload)
+            meta = meta or {}
+
+            doc_id = meta.get(PDFMetadataKeys.DOCUMENT_ID, "<unknown>")
+            stats = documents.setdefault(
+                doc_id,
+                {
+                    "document_id": doc_id,
+                    "filename": meta.get(PDFMetadataKeys.FILENAME, ""),
+                    "total_pages": meta.get(PDFMetadataKeys.TOTAL_PAGES, 0),
+                    "apa_citation": meta.get("apa_zitation")
+                    or meta.get(DoclingMetadataKeys.APA_CITATION)
+                    or "",
+                    "chunk_count": 0,
+                    "page_label_count": 0,
+                    "book_page_coverage": 0,
+                    "chapter_title_coverage": 0,
+                    "figure_count": 0,
+                    "has_section_headers": False,
+                    "chunk_types": {},
+                    "book_page_start": None,
+                    "book_page_end": None,
+                },
+            )
+
+            stats["chunk_count"] += 1
+            if meta.get(PDFMetadataKeys.PAGE_LABEL) is not None:
+                stats["page_label_count"] += 1
+            if meta.get(DoclingMetadataKeys.BOOK_PAGE_START) is not None:
+                stats["book_page_coverage"] += 1
+                start = meta.get(DoclingMetadataKeys.BOOK_PAGE_START)
+                end = meta.get(DoclingMetadataKeys.BOOK_PAGE_END, start)
+                stats["book_page_start"] = (
+                    start
+                    if stats["book_page_start"] is None
+                    else min(stats["book_page_start"], start)
+                )
+                stats["book_page_end"] = (
+                    end
+                    if stats["book_page_end"] is None
+                    else max(stats["book_page_end"], end)
+                )
+            if meta.get(PDFMetadataKeys.CHAPTER_TITLE):
+                stats["chapter_title_coverage"] += 1
+
+            chunk_type = meta.get(DoclingMetadataKeys.CHUNK_TYPE, "text")
+            stats["chunk_types"][chunk_type] = stats["chunk_types"].get(chunk_type, 0) + 1
+            if chunk_type == "section_header":
+                stats["has_section_headers"] = True
+
+            figure_paths = meta.get(DoclingMetadataKeys.FIGURE_PATHS) or []
+            stats["figure_count"] += len(figure_paths)
+
+        chapters = await self.list_chapters(
+            collection_name=collection_name,
+            document_id=document_id,
+        )
+        chapter_map: dict[str, list[dict[str, Any]]] = {}
+        for chapter in chapters:
+            chapter_map.setdefault(chapter.get("document_id", ""), []).append(chapter)
+
+        inventory_documents: list[dict[str, Any]] = []
+        for doc_id, stats in sorted(documents.items(), key=lambda item: item[0]):
+            doc_chapters = chapter_map.get(doc_id, [])
+            stats["chapter_count"] = len(doc_chapters)
+            stats["chapters"] = doc_chapters
+            stats["has_book_page_numbers"] = stats["book_page_coverage"] > 0
+            stats["has_figures"] = stats["figure_count"] > 0
+            inventory_documents.append(stats)
+
+        inventory["document_count"] = len(inventory_documents)
+        inventory["documents"] = inventory_documents
+        return inventory
+
+    async def verify_ingestion(
+        self,
+        collection_name: str | None = None,
+        document_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return ingestion health checks and warnings for one collection or document."""
+        inventory = await self.get_inventory(
+            collection_name=collection_name,
+            document_id=document_id,
+        )
+        verification: dict[str, Any] = {
+            "collection_name": inventory.get("collection_name"),
+            "document_count": inventory.get("document_count", 0),
+            "status": "ok",
+            "documents": [],
+        }
+
+        if not inventory.get("documents"):
+            verification["status"] = "warning"
+            return verification
+
+        overall_warning = False
+        for document in inventory["documents"]:
+            warnings: list[str] = []
+            if document["chunk_count"] == 0:
+                warnings.append("No chunks indexed.")
+            if document["page_label_count"] == 0:
+                warnings.append("No page labels detected.")
+            if document["chapter_title_coverage"] == 0:
+                warnings.append("No chapter metadata detected.")
+            if document["chapter_count"] == 0:
+                warnings.append("No table-of-contents entries available.")
+            if document["chapter_count"] > 0 and not document["has_section_headers"]:
+                warnings.append(
+                    "No section_header chunks detected; chapter inventory is using legacy fallback heuristics."
+                )
+            if not document["has_book_page_numbers"]:
+                warnings.append("Printed book page numbers are missing.")
+
+            status = "ok" if not warnings else "warning"
+            overall_warning = overall_warning or bool(warnings)
+            verification["documents"].append(
+                {
+                    "document_id": document["document_id"],
+                    "filename": document.get("filename", ""),
+                    "status": status,
+                    "chunk_count": document["chunk_count"],
+                    "chapter_count": document["chapter_count"],
+                    "has_section_headers": document["has_section_headers"],
+                    "has_book_page_numbers": document["has_book_page_numbers"],
+                    "has_figures": document["has_figures"],
+                    "warnings": warnings,
+                }
+            )
+
+        if overall_warning:
+            verification["status"] = "warning"
+        return verification
+
     async def keyword_search(
         self,
         keyword: str,
@@ -745,6 +929,7 @@ class QdrantConnector:
             return []
 
         chapters: dict[str, dict] = {}
+        doc_candidates: dict[str, list[dict]] = {}
         offset = None
 
         must_conditions: list[models.Condition] = []
@@ -768,30 +953,186 @@ class QdrantConnector:
             )
 
             for point in points:
-                _content, meta = self._extract_content_and_metadata(point.payload)
+                content, meta = self._extract_content_and_metadata(point.payload)
                 meta = meta or {}
 
-                chapter = meta.get("chapter_title")
+                chunk_type = meta.get("chunk_type")
+                chapter = self._resolve_chapter_title(content, meta)
                 if not chapter:
                     continue
 
                 physical = meta.get("physical_page_index", 999999)
-                page_label = meta.get("page_label", "")
+                page_label = meta.get("page_label") or meta.get("book_page_start", "")
                 doc_id = meta.get("document_id", "")
+                heading_l1 = meta.get("heading_l1")
+                heading_l2 = meta.get("heading_l2")
+                heading_l3 = meta.get("heading_l3")
 
-                if chapter not in chapters or physical < chapters[chapter]["first_physical_index"]:
-                    chapters[chapter] = {
+                doc_candidates.setdefault(doc_id, []).append(
+                    {
                         "chapter_title": chapter,
                         "first_page_label": page_label,
                         "first_physical_index": physical,
                         "document_id": doc_id,
+                        "_chunk_type": chunk_type,
+                        "_heading_l1": heading_l1,
+                        "_heading_l2": heading_l2,
+                        "_heading_l3": heading_l3,
+                        "_header_level": self._resolve_docling_header_level(
+                            chapter,
+                            meta,
+                        ),
+                        "_number_depth": self._chapter_number_depth(chapter),
                     }
+                )
 
             if next_offset is None:
                 break
             offset = next_offset
 
+        for candidates in doc_candidates.values():
+            for chapter in self._finalize_chapter_candidates(candidates):
+                title = chapter["chapter_title"]
+                if title not in chapters or (
+                    chapter["first_physical_index"]
+                    < chapters[title]["first_physical_index"]
+                ):
+                    chapters[title] = chapter
+
         return sorted(chapters.values(), key=lambda x: x["first_physical_index"])
+
+    @staticmethod
+    def _resolve_chapter_title(content: str, metadata: Metadata) -> str | None:
+        """Prefer section-header content over inherited chapter metadata."""
+        if metadata.get("chunk_type") == "section_header":
+            header = content.strip()
+            if header:
+                return header
+        return (
+            metadata.get("chapter_title")
+            or metadata.get("chapter")
+            or metadata.get("heading_l1")
+        )
+
+    @staticmethod
+    def _chapter_number_depth(title: str) -> int:
+        """Return heading numbering depth, e.g. 43.1 -> 2, 43.1.1 -> 3."""
+        match = re.match(r"^\s*(\d+(?:\.\d+)*)\b", title)
+        if not match:
+            return 0
+        return match.group(1).count(".") + 1
+
+    @staticmethod
+    def _dotted_numbering(title: str) -> tuple[int, ...] | None:
+        """Return dotted numbering tuples like (12, 4, 2) for structural headings."""
+        match = re.match(r"^\s*(\d+(?:\.\d+)+)\b", title)
+        if not match:
+            return None
+        return tuple(int(part) for part in match.group(1).split("."))
+
+    @staticmethod
+    def _resolve_docling_header_level(title: str, metadata: Metadata) -> int:
+        """Resolve the actual Docling heading level for a section-header chunk."""
+        if metadata.get("chunk_type") != "section_header":
+            return 0
+
+        if title == metadata.get("heading_l1"):
+            return 1
+        if title == metadata.get("heading_l2"):
+            return 2
+        if title == metadata.get("heading_l3"):
+            return 3
+        return 0
+
+    @classmethod
+    def _finalize_chapter_candidates(cls, chapters: list[dict]) -> list[dict]:
+        """Collapse Docling section headers to a compact top-level TOC."""
+        if not chapters:
+            return []
+
+        chapters = sorted(chapters, key=lambda item: item["first_physical_index"])
+        has_section_headers = any(
+            chapter.get("_chunk_type") == "section_header" for chapter in chapters
+        )
+
+        if has_section_headers:
+            section_headers = [
+                chapter
+                for chapter in chapters
+                if chapter.get("_chunk_type") == "section_header"
+            ]
+            positive_header_levels = [
+                chapter["_header_level"]
+                for chapter in section_headers
+                if chapter["_header_level"] > 0
+            ]
+            if positive_header_levels:
+                top_level_depth = min(positive_header_levels)
+                chapters = [
+                    chapter
+                    for chapter in section_headers
+                    if chapter.get("_header_level") == top_level_depth
+                ]
+            else:
+                positive_depths = [
+                    chapter["_number_depth"]
+                    for chapter in section_headers
+                    if chapter["_number_depth"] > 0
+                ]
+                top_level_depth = (
+                    min(positive_depths) if positive_depths else None
+                )
+                chapters = [
+                    chapter
+                    for chapter in section_headers
+                    if cls._is_top_level_section_header(
+                        chapter,
+                        top_level_depth,
+                    )
+                ]
+        else:
+            dotted_chapters = []
+            min_depth_by_root: dict[int, int] = {}
+
+            for chapter in chapters:
+                numbering = cls._dotted_numbering(chapter["chapter_title"])
+                if numbering is None:
+                    continue
+                dotted_chapters.append((chapter, numbering))
+                root = numbering[0]
+                depth = len(numbering)
+                min_depth_by_root[root] = min(depth, min_depth_by_root.get(root, depth))
+
+            if dotted_chapters:
+                chapters = [
+                    chapter
+                    for chapter, numbering in dotted_chapters
+                    if len(numbering) == min_depth_by_root[numbering[0]]
+                ]
+
+        deduped: dict[str, dict] = {}
+        for chapter in chapters:
+            title = chapter["chapter_title"]
+            if title not in deduped:
+                deduped[title] = {
+                    key: value
+                    for key, value in chapter.items()
+                    if not key.startswith("_")
+                }
+        return list(deduped.values())
+
+    @staticmethod
+    def _is_top_level_section_header(
+        chapter: dict, top_level_depth: int | None
+    ) -> bool:
+        """Keep only top-level section headers and real front-matter headings."""
+        number_depth = chapter.get("_number_depth", 0)
+        if number_depth > 0:
+            return top_level_depth is None or number_depth == top_level_depth
+
+        title = chapter.get("chapter_title", "")
+        heading_l1 = chapter.get("_heading_l1") or ""
+        return not heading_l1 or heading_l1 == title
 
     async def _ensure_text_index(self, collection_name: str) -> None:
         """

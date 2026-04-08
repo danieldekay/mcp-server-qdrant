@@ -13,6 +13,7 @@ dependencies = [
     "pypdf>=5.1.0",
     "markitdown",
     "python-dotenv>=1.1.0",
+    "docling>=2.85.0",
 ]
 
 [project.optional-dependencies]
