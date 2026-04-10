@@ -32,6 +32,8 @@ uv sync
 
 **Set required environment variables:**
 
+**macOS / Linux (bash/zsh):**
+
 ```bash
 export QDRANT_URL="http://localhost:6333"
 export COLLECTION_NAME="my-collection"
@@ -39,12 +41,31 @@ export EMBEDDING_PROVIDER="fastembed"  # or "openai"
 export EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+$env:QDRANT_URL = "http://localhost:6333"
+$env:COLLECTION_NAME = "my-collection"
+$env:EMBEDDING_PROVIDER = "fastembed"  # or "openai"
+$env:EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+```
+
 **For OpenAI provider (optional):**
+
+**macOS / Linux:**
 
 ```bash
 export EMBEDDING_PROVIDER="openai"
 export EMBEDDING_MODEL="text-embedding-3-small"
 export OPENAI_API_KEY="your-api-key"
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:EMBEDDING_PROVIDER = "openai"
+$env:EMBEDDING_MODEL = "text-embedding-3-small"
+$env:OPENAI_API_KEY = "your-api-key"
 ```
 
 **Start the MCP server (stdio transport):**

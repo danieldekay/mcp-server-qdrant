@@ -249,6 +249,47 @@ For local Qdrant mode:
 
 This MCP server will automatically create a collection with the specified name if it doesn't exist.
 
+### Development from Source
+
+To install from source for development or standalone use:
+
+```bash
+git clone https://github.com/danieldekay/mcp-server-qdrant.git
+cd mcp-server-qdrant
+uv sync
+```
+
+> **Note:** `uv sync` automatically creates a `.venv` in the project directory and installs all
+> dependencies. The project pins Python 3.10 via `.python-version` — `uv` will install it if needed.
+
+Set environment variables and run:
+
+**macOS / Linux (bash/zsh):**
+
+```bash
+export QDRANT_URL="http://localhost:6333"
+export COLLECTION_NAME="my-collection"
+export EMBEDDING_PROVIDER="fastembed"
+export EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"
+uv run mcp-server-qdrant
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:QDRANT_URL = "http://localhost:6333"
+$env:COLLECTION_NAME = "my-collection"
+$env:EMBEDDING_PROVIDER = "fastembed"
+$env:EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+uv run mcp-server-qdrant
+```
+
+Verify the installation:
+
+```bash
+uv run python -c "import qdrant_client; print('OK')"
+```
+
 By default, the server will use the `sentence-transformers/all-MiniLM-L6-v2` embedding model to encode memories.
 For the time being, only [FastEmbed](https://qdrant.github.io/fastembed/) models are supported.
 
