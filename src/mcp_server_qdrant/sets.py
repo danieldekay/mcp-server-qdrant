@@ -63,7 +63,7 @@ class SetMatcher:
             return
 
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
             for set_config in config.get("sets", []):
