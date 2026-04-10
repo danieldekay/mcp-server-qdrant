@@ -1802,11 +1802,13 @@ dependencies = [
     { name = "docling" },
     { name = "fastmcp" },
     { name = "markitdown" },
+    { name = "nltk" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pypdf" },
     { name = "python-dotenv" },
     { name = "qdrant-client" },
+    { name = "tiktoken" },
 ]
 
 [package.optional-dependencies]
@@ -1860,6 +1862,7 @@ requires-dist = [
     { name = "markitdown" },
     { name = "mcp-server-qdrant", extras = ["fastembed", "openai", "gemini", "openrouter", "model2vec", "chunking"], marker = "extra == 'all'" },
     { name = "model2vec", marker = "extra == 'model2vec'", specifier = "==0.6.0" },
+    { name = "nltk", specifier = ">=3.8.1" },
     { name = "nltk", marker = "extra == 'chunking'", specifier = ">=3.8.1" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.109.1" },
     { name = "openai", marker = "extra == 'openrouter'", specifier = ">=1.109.1" },
@@ -1868,6 +1871,7 @@ requires-dist = [
     { name = "pypdf", specifier = ">=5.1.0" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "qdrant-client", specifier = ">=1.12.0" },
+    { name = "tiktoken", specifier = ">=0.5.0" },
     { name = "tiktoken", marker = "extra == 'chunking'", specifier = ">=0.5.0" },
 ]
 provides-extras = ["fastembed", "openai", "gemini", "openrouter", "model2vec", "chunking", "all"]
